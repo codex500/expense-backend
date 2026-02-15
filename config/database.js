@@ -1,26 +1,36 @@
 /**
- * Database - Neon over HTTP (no WebSocket). Works from Render without 404/timeouts.
- * Exposes a pool-like API so models stay unchanged.
+ * PostgreSQL connection pool (pg / node-postgres)
+ * For Neon: use DATABASE_URL with SSL. Compatible with Render.
  */
 
-const { neon } = require('@neondatabase/serverless');
+const { Pool } = require('pg');
 
-const connectionString = process.env.DATABASE_URL;
+let connectionString = (process.env.DATABASE_URL || '').trim().replace(/^["']|["']$/g, '');
 if (!connectionString) {
-  throw new Error('DATABASE_URL is required');
+  throw new Error('DATABASE_URL is required.');
+}
+if (connectionString.startsWith('https://') || connectionString.includes('apirest') || connectionString.includes('/rest/')) {
+  throw new Error(
+    'DATABASE_URL must be a Postgres connection string (postgresql://user:password@host/db?sslmode=require), not the Neon REST/API URL.'
+  );
+}
+if (connectionString.startsWith('postgres://')) {
+  connectionString = 'postgresql://' + connectionString.slice(11);
+}
+if (!connectionString.startsWith('postgresql://')) {
+  throw new Error('DATABASE_URL must start with postgresql:// or postgres://');
 }
 
-// fullResults: true so return value has .rows like node-postgres
-const sql = neon(connectionString, { fullResults: true });
+const pool = new Pool({
+  connectionString,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
 
-const pool = {
-  async query(text, params = []) {
-    const result = await sql.query(text, params);
-    return result;
-  },
-  end() {
-    // No-op for HTTP (no persistent connection)
-  },
-};
+pool.on('error', (err) => {
+  console.error('Database pool error:', err.message);
+});
 
 module.exports = pool;
