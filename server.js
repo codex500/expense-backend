@@ -33,6 +33,11 @@ app.use('/api/budget', budgetRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/categories', categoryRoutes);
 
+
+app.get("/", (req, res) => {
+  res.send("API is running");
+});
+
 // Health check (for Render / load balancers)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
