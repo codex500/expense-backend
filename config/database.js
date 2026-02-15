@@ -1,23 +1,26 @@
 /**
- * Database configuration - Neon serverless driver (HTTP/WebSocket)
- * Avoids TCP timeouts when connecting from Render to Neon
+ * Database - Neon over HTTP (no WebSocket). Works from Render without 404/timeouts.
+ * Exposes a pool-like API so models stay unchanged.
  */
 
-const { Pool, neonConfig } = require('@neondatabase/serverless');
-const ws = require('ws');
+const { neon } = require('@neondatabase/serverless');
 
-// Node.js needs explicit WebSocket for Neon Pool
-neonConfig.webSocketConstructor = ws;
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL is required');
+}
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 5,
-  idleTimeoutMillis: 60000,
-  connectionTimeoutMillis: 60000,
-});
+// fullResults: true so return value has .rows like node-postgres
+const sql = neon(connectionString, { fullResults: true });
 
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
-});
+const pool = {
+  async query(text, params = []) {
+    const result = await sql.query(text, params);
+    return result;
+  },
+  end() {
+    // No-op for HTTP (no persistent connection)
+  },
+};
 
 module.exports = pool;
