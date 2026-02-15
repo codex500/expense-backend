@@ -32,6 +32,10 @@ function isNonEmptyString(value) {
  */
 function validateRegister(body) {
   const errors = [];
+  if (!body || typeof body !== 'object') {
+    errors.push('Request body is required (JSON with name, email, password).');
+    return errors;
+  }
   if (!isNonEmptyString(body.name)) errors.push('Name is required and cannot be empty.');
   if (!isNonEmptyString(body.email)) errors.push('Email is required.');
   else if (!isValidEmail(body.email)) errors.push('Invalid email format.');
@@ -49,6 +53,10 @@ function validateRegister(body) {
  */
 function validateLogin(body) {
   const errors = [];
+  if (!body || typeof body !== 'object') {
+    errors.push('Request body is required (JSON with email, password).');
+    return errors;
+  }
   if (!isNonEmptyString(body.email)) errors.push('Email is required.');
   else if (!isValidEmail(body.email)) errors.push('Invalid email format.');
   if (!isNonEmptyString(body.password)) errors.push('Password is required.');

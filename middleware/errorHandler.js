@@ -4,10 +4,9 @@
  */
 
 function errorHandler(err, req, res, next) {
+  const isDev = process.env.NODE_ENV !== 'production';
   console.error('Error:', err.message);
-  if (process.env.NODE_ENV === 'development') {
-    console.error(err.stack);
-  }
+  console.error(err.stack);
 
   // JWT errors already handled in auth middleware; duplicate here as fallback
   if (err.name === 'JsonWebTokenError') {
@@ -39,10 +38,29 @@ function errorHandler(err, req, res, next) {
     });
   }
 
+  // Connection/timeout errors - often DB or network
+  if (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || (err.message && err.message.includes('timeout'))) {
+    return res.status(503).json({
+      success: false,
+      message: 'Service temporarily unavailable. Please try again.',
+    });
+  }
+
+  // Table/schema missing (e.g. "relation \"users\" does not exist")
+  if (err.code === '42P01' || (err.message && err.message.includes('does not exist'))) {
+    return res.status(500).json({
+      success: false,
+      message: 'Database tables are missing. Run the schema (e.g. npm run db:setup) against your database.',
+    });
+  }
+
   const status = err.statusCode || 500;
+  const message = status === 500 && !isDev
+    ? 'Internal server error.'
+    : (err.message || 'Internal server error.');
   res.status(status).json({
     success: false,
-    message: err.message || 'Internal server error.',
+    message,
   });
 }
 

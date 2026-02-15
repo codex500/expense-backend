@@ -38,6 +38,24 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root: show API base (avoids 404 when someone hits the wrong URL)
+app.get('/', (req, res) => {
+  const base = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    message: 'Expense Tracker API',
+    base: `${base}/api`,
+    endpoints: {
+      auth: `${base}/api/auth/register, /api/auth/login, /api/auth/me`,
+      transactions: `${base}/api/transactions`,
+      dashboard: `${base}/api/dashboard`,
+      budget: `${base}/api/budget`,
+      analytics: `${base}/api/analytics/*`,
+      categories: `${base}/api/categories`,
+    },
+    health: `${base}/health`,
+  });
+});
+
 // 404
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found.' });
