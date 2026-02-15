@@ -1,23 +1,19 @@
 /**
- * Database configuration - PostgreSQL (Neon) connection pool
- * Uses pg driver with connection string from environment
+ * Database configuration - Neon serverless driver (HTTP/WebSocket)
+ * Avoids TCP timeouts when connecting from Render to Neon
  */
 
-const { Pool } = require('pg');
+const { Pool, neonConfig } = require('@neondatabase/serverless');
+const ws = require('ws');
 
-// Neon: use -pooler host for serverless (Render). Long timeout for cold start (free tier suspends).
+// Node.js needs explicit WebSocket for Neon Pool
+neonConfig.webSocketConstructor = ws;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
   max: 5,
   idleTimeoutMillis: 60000,
   connectionTimeoutMillis: 60000,
-  allowExitOnIdle: false,
-});
-
-// Test connection on startup
-pool.on('connect', () => {
-  console.log('Database connected');
 });
 
 pool.on('error', (err) => {

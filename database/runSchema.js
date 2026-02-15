@@ -3,14 +3,9 @@
  * Usage: node database/runSchema.js   or  npm run db:setup
  */
 require('dotenv').config();
-const { Pool } = require('pg');
+const pool = require('../config/database');
 const fs = require('fs');
 const path = require('path');
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 async function run() {
   if (!process.env.DATABASE_URL) {
