@@ -7,6 +7,7 @@ require('dotenv').config();
 const express = require('express');
 const { validateEnv } = require('./config/env');
 const errorHandler = require('./middleware/errorHandler');
+const pool = require('./config/database');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -33,10 +34,6 @@ app.use('/api/budget', budgetRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/categories', categoryRoutes);
 
-
-app.get("/", (req, res) => {
-  res.send("API is running");
-});
 
 // Health check (for Render / load balancers)
 app.get('/health', (req, res) => {
@@ -71,4 +68,6 @@ app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Expense Tracker API running on port ${PORT}`);
+  // Warm up DB connection (Neon cold start can take 10–30s; this runs in background)
+  pool.query('SELECT 1').then(() => console.log('Database warmup OK')).catch((err) => console.warn('Database warmup:', err.message));
 });

@@ -5,13 +5,14 @@
 
 const { Pool } = require('pg');
 
-// Neon requires SSL; allow longer timeout for cold start (free tier suspends)
+// Neon: use -pooler host for serverless (Render). Long timeout for cold start (free tier suspends).
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 30000,
+  max: 5,
+  idleTimeoutMillis: 60000,
+  connectionTimeoutMillis: 60000,
+  allowExitOnIdle: false,
 });
 
 // Test connection on startup
