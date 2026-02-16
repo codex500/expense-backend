@@ -27,7 +27,7 @@ cd "c:\Users\dj960\OneDrive\Documents\expense tracker"
 npm install
 ```
 
-This installs: `express`, `pg`, `bcrypt`, `jsonwebtoken`, `dotenv`, `uuid`.
+This installs: `express`, `pg`, `bcrypt`, `jsonwebtoken`, `dotenv`, `uuid`, `node-cron`, `nodemailer`.
 
 ---
 
@@ -108,6 +108,12 @@ In the service → **Environment** tab, add:
 | `JWT_SECRET`   | Strong random secret (e.g. 32+ char hex) |
 | `NODE_ENV`     | `production` |
 | `PORT`         | Leave empty (Render sets it automatically) |
+| `EMAIL_ENABLED`| `true` to enable reminder emails (optional, default: off) |
+| `SMTP_HOST`    | e.g. `smtp.gmail.com` (required if EMAIL_ENABLED=true) |
+| `SMTP_PORT`    | e.g. `587` |
+| `SMTP_USER`    | Your SMTP username / email |
+| `SMTP_PASS`    | SMTP password (Gmail: use App Password) |
+| `MAIL_FROM`    | Optional sender address, e.g. `Trackify <noreply@trackify.app>` |
 
 Save. Render will redeploy if needed.
 
@@ -125,15 +131,54 @@ Save. Render will redeploy if needed.
 
 ---
 
+## 6. Email Reminder Jobs (Optional)
+
+Automated reminder emails use **node-cron** and **nodemailer**.
+
+### Behavior
+
+- **Hourly (every hour at :00):** Users with no transaction in the last 24h get a reminder.
+- **Evening (20:00–21:00):** Every 6 minutes, up to 10 users with no transaction today get an evening reminder.
+- No duplicate emails to the same user within the same hour.
+
+### Enable in production
+
+1. Set `EMAIL_ENABLED=true` in Render environment variables.
+2. Set SMTP variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
+3. For Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your normal password.
+
+### Test locally
+
+```bash
+# 1. Add to .env:
+EMAIL_ENABLED=true
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your-app-password
+
+# 2. Run server
+npm start
+
+# 3. Manually trigger jobs (add to a test script or run in node REPL):
+const { runHourlyReminder, runEveningReminder } = require('./jobs/reminderJobs');
+runHourlyReminder();  // or runEveningReminder();
+```
+
+Or temporarily change the cron schedule in `jobs/reminderJobs.js` (e.g. `'* * * * *'` for every minute) to see it run, then revert.
+
+---
+
 ## Project Structure
 
 ```
 config/         – database pool, env validation
 controllers/    – auth, transactions, dashboard, budget, analytics, categories
+jobs/           – reminderJobs.js (node-cron hourly + evening emails)
 middleware/     – JWT auth, error handler
 routes/         – API route definitions
 models/         – User, Transaction, Category
-utils/          – validation helpers
+utils/          – validation helpers, mailer.js (nodemailer)
 database/       – schema.sql
 docs/           – API_ENDPOINTS.md, POSTMAN_EXAMPLES.md
 server.js       – app entry point
