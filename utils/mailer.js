@@ -1,56 +1,68 @@
 /**
- * Nodemailer utility for sending emails
- * Configure via SMTP env vars: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+ * Resend Email API utility
+ * Uses RESEND_API_KEY - no SMTP ports, works on Render.
+ * Sends HTML emails via HTTPS.
  */
 
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-function createTransport() {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!host || !user || !pass) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
-}
-
-const transporter = createTransport();
+const apiKey = process.env.RESEND_API_KEY || '';
+const resend = apiKey ? new Resend(apiKey) : null;
+const fromAddress = process.env.MAIL_FROM || 'Trackify <onboarding@resend.dev>';
 
 /**
- * Send an email
+ * Escape text for safe HTML
+ */
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Convert plain text to HTML
+ */
+function textToHtml(text) {
+  const escaped = escapeHtml(text);
+  return `<p style="font-family: sans-serif; font-size: 16px; line-height: 1.6;">${escaped.replace(/\n/g, '</p><p style="font-family: sans-serif; font-size: 16px; line-height: 1.6;">')}</p>`;
+}
+
+/**
+ * Send an email via Resend API
  * @param {string} to - Recipient email
  * @param {string} subject - Email subject
- * @param {string} text - Plain text body
- * @returns {Promise<boolean>} - true if sent, false if mailer not configured
+ * @param {string} text - Plain text body (converted to HTML)
+ * @param {string} [html] - Optional HTML body (overrides text if provided)
+ * @returns {Promise<boolean>} - true if sent, false otherwise (never throws)
  */
-async function sendEmail(to, subject, text) {
-  if (!transporter) {
-    console.warn('[Mailer] SMTP not configured (missing SMTP_HOST, SMTP_USER, SMTP_PASS). Skipping email.');
+async function sendEmail(to, subject, text, html) {
+  if (!resend) {
+    console.warn('[Mailer] RESEND_API_KEY not set. Skipping email.');
     return false;
   }
 
-  const from = process.env.MAIL_FROM || process.env.SMTP_USER || 'noreply@trackify.app';
+  const body = html || textToHtml(text);
 
   try {
-    await transporter.sendMail({
-      from,
-      to,
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to: [to],
       subject,
-      text,
+      html: body,
     });
+
+    if (error) {
+      console.error('[Mailer] Send failed:', error.message);
+      return false;
+    }
+
+    console.log('[Mailer] Email sent to', to, 'id:', data?.id || 'ok');
     return true;
   } catch (err) {
     console.error('[Mailer] Send failed:', err.message);
-    throw err;
+    return false;
   }
 }
 

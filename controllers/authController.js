@@ -6,6 +6,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validateRegister, validateLogin } = require('../utils/validation');
+const { sendEmail } = require('../utils/mailer');
 
 const SALT_ROUNDS = 10;
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
@@ -38,6 +39,15 @@ async function register(req, res, next) {
       process.env.JWT_SECRET,
       { expiresIn: JWT_EXPIRY }
     );
+    // Welcome email (fire-and-forget, never blocks response)
+    if (process.env.EMAIL_ENABLED === 'true') {
+      sendEmail(
+        user.email,
+        'Welcome to Trackify! 🎉',
+        `Hi ${user.name},\n\nWelcome to Trackify! You're all set to track your expenses and stay on top of your budget.\n\nLog in to get started.`
+      ).catch((err) => console.error('[Auth] Welcome email failed:', err.message));
+    }
+
     res.status(201).json({
       success: true,
       message: 'User registered successfully.',

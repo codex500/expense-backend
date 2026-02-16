@@ -10,18 +10,24 @@
     "jobs:test-hourly": "node -e \"require('dotenv').config(); require('./jobs/reminderJobs').runHourlyReminder().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\"",
     "jobs:test-evening": "node -e \"require('dotenv').config(); require('./jobs/reminderJobs').runEveningReminder().then(() => process.exit(0)).catch(e => { console.error(e); process.exit(1); })\""
   },
-  "keywords": ["expense-tracker", "api", "nodejs", "express", "postgresql"],
+  "keywords": [
+    "expense-tracker",
+    "api",
+    "nodejs",
+    "express",
+    "postgresql"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^5.1.1",
-    "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.8",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
+    "node-cron": "^3.0.3",
     "pg": "^8.11.3",
+    "resend": "^4.8.0",
     "uuid": "^9.0.1"
   },
   "overrides": {
