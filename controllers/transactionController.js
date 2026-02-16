@@ -4,6 +4,7 @@
 
 const Transaction = require('../models/Transaction');
 const { validateTransaction } = require('../utils/validation');
+const { updateStreak } = require('../services/streakService');
 
 /**
  * POST /api/transactions
@@ -26,6 +27,11 @@ async function addTransaction(req, res, next) {
       note: note ? note.trim() : null,
       transactionDate,
     });
+    
+    // Update streak (fire-and-forget)
+    updateStreak(req.user.id, transactionDate.toISOString().slice(0, 10))
+      .catch((err) => console.error('[Transaction] Streak update failed:', err.message));
+    
     res.status(201).json({
       success: true,
       message: 'Transaction added.',

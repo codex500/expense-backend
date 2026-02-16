@@ -12,5 +12,6 @@ router.use(authenticate);
 router.get('/category-expense', analyticsController.getCategoryExpense);
 router.get('/monthly-spending', analyticsController.getMonthlySpending);
 router.get('/last-7-days', analyticsController.getLast7Days);
+router.get('/weekly', analyticsController.getWeekly);
 
 module.exports = router;

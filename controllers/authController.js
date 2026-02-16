@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { validateRegister, validateLogin } = require('../utils/validation');
 const { sendEmail } = require('../utils/mailer');
+const { getUserStreak } = require('../services/streakService');
 
 const SALT_ROUNDS = 10;
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '7d';
@@ -116,6 +117,7 @@ async function login(req, res, next) {
  */
 async function getMe(req, res, next) {
   try {
+    const streak = await getUserStreak(req.user.id);
     res.json({
       success: true,
       data: {
@@ -125,6 +127,10 @@ async function getMe(req, res, next) {
           email: req.user.email,
           monthly_budget: req.user.monthly_budget,
           created_at: req.user.created_at,
+          streak: {
+            current_streak: streak.current_streak,
+            longest_streak: streak.longest_streak,
+          },
         },
       },
     });

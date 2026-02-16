@@ -18,8 +18,10 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
+const advisorRoutes = require('./routes/advisorRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const pool = require('./config/database');
-const { startReminderJobs } = require('./jobs/reminderJobs');
+const { startDailyReminderJob } = require('./cron/reminderJob');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +46,8 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/budget', budgetRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/categories', categoryRoutes);
+app.use('/api/advisor', advisorRoutes);
+app.use('/api/report', reportRoutes);
 
 // Health (for Render and load balancers)
 app.get('/health', (req, res) => {
@@ -79,5 +83,5 @@ app.use(errorHandler);
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Expense Tracker API running on port ${PORT}`);
   pool.query('SELECT 1').then(() => console.log('Database warmup OK')).catch((err) => console.warn('Database warmup:', err.message));
-  startReminderJobs();
+  startDailyReminderJob();
 });

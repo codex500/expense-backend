@@ -24,7 +24,7 @@ async function create({ name, email, passwordHash, monthlyBudget = 0 }) {
  */
 async function findByEmail(email) {
   const result = await pool.query(
-    'SELECT id, name, email, password, monthly_budget, created_at FROM users WHERE email = $1',
+    'SELECT id, name, email, password, monthly_budget, budget_limit, created_at FROM users WHERE email = $1',
     [email]
   );
   return result.rows[0];
@@ -35,7 +35,7 @@ async function findByEmail(email) {
  */
 async function findById(id) {
   const result = await pool.query(
-    'SELECT id, name, email, monthly_budget, created_at FROM users WHERE id = $1',
+    'SELECT id, name, email, monthly_budget, budget_limit, created_at FROM users WHERE id = $1',
     [id]
   );
   return result.rows[0];
@@ -47,8 +47,20 @@ async function findById(id) {
 async function updateMonthlyBudget(userId, monthlyBudget) {
   const result = await pool.query(
     `UPDATE users SET monthly_budget = $1 WHERE id = $2
-     RETURNING id, name, email, monthly_budget, created_at`,
+     RETURNING id, name, email, monthly_budget, budget_limit, created_at`,
     [monthlyBudget, userId]
+  );
+  return result.rows[0];
+}
+
+/**
+ * Update budget limit for a user
+ */
+async function updateBudgetLimit(userId, budgetLimit) {
+  const result = await pool.query(
+    `UPDATE users SET budget_limit = $1 WHERE id = $2
+     RETURNING id, name, email, monthly_budget, budget_limit, created_at`,
+    [budgetLimit, userId]
   );
   return result.rows[0];
 }
@@ -58,4 +70,5 @@ module.exports = {
   findByEmail,
   findById,
   updateMonthlyBudget,
+  updateBudgetLimit,
 };
