@@ -8,7 +8,7 @@ const { Resend } = require('resend');
 
 const apiKey = process.env.RESEND_API_KEY || '';
 const resend = apiKey ? new Resend(apiKey) : null;
-const fromAddress = process.env.MAIL_FROM || 'Trackify <onboarding@resend.dev>';
+const fromAddress = process.env.MAIL_FROM || 'Trackify <no-reply@trackifyapp.space>';
 
 /**
  * Escape text for safe HTML
