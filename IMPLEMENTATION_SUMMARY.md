@@ -91,7 +91,7 @@ routes/
 
 ## 🗄️ Database Changes
 
-Run `database/migrations.sql` in Neon SQL Editor:
+Run `database/migrations.sql` in Supabase SQL Editor:
 
 1. **email_logs** table - Tracks daily emails
 2. **user_streaks** table - Gamification streaks
@@ -124,7 +124,7 @@ APP_URL=https://trackifyapp.space
 
 ## 🚀 Deployment Steps
 
-1. **Run migrations** - Execute `database/migrations.sql` in Neon
+1. **Run migrations** - Execute `database/migrations.sql` in Supabase SQL Editor
 2. **Install dependencies** - `npm install` (adds pdfkit)
 3. **Set env vars** - Add to Render environment
 4. **Deploy** - Push to Render
@@ -138,6 +138,9 @@ APP_URL=https://trackifyapp.space
 | GET | `/api/advisor` | Smart spending insights |
 | GET | `/api/report/monthly` | Download monthly PDF report |
 | GET | `/api/analytics/weekly` | Weekly spending analytics |
+| GET | `/api/analytics/category-income` | Income by category |
+| GET | `/api/analytics/monthly-income` | Monthly income over time |
+| GET | `/api/analytics/monthly-summary` | Income + expense per month |
 | GET | `/api/auth/me` | Now includes streak data |
 | PUT | `/api/budget` | Now supports `budget_limit` |
 

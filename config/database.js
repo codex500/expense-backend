@@ -1,6 +1,6 @@
 /**
  * PostgreSQL connection pool (pg / node-postgres)
- * For Neon: use DATABASE_URL with SSL. Compatible with Render.
+ * Compatible with Supabase, and any PostgreSQL connection string.
  */
 
 const { Pool } = require('pg');
@@ -9,9 +9,9 @@ let connectionString = (process.env.DATABASE_URL || '').trim().replace(/^["']|["
 if (!connectionString) {
   throw new Error('DATABASE_URL is required.');
 }
-if (connectionString.startsWith('https://') || connectionString.includes('apirest') || connectionString.includes('/rest/')) {
+if (connectionString.startsWith('https://') || connectionString.includes('/rest/')) {
   throw new Error(
-    'DATABASE_URL must be a Postgres connection string (postgresql://user:password@host/db?sslmode=require), not the Neon REST/API URL.'
+    'DATABASE_URL must be a Postgres connection string (postgresql://user:password@host/db?sslmode=require), not a REST/API URL.'
   );
 }
 if (connectionString.startsWith('postgres://')) {

@@ -1,5 +1,5 @@
--- Expense Tracker - PostgreSQL (Neon) schema
--- Run this in your Neon SQL Editor or psql to create tables
+-- Expense Tracker - PostgreSQL (Supabase) schema
+-- Run this in Supabase SQL Editor or psql to create tables
 
 -- Enable UUID extension (if not already)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

@@ -6,7 +6,7 @@ In **Render Dashboard** → your **Web Service** → **Environment**, add:
 
 | Key | Value | Required |
 |-----|--------|----------|
-| `DATABASE_URL` | Neon **Postgres** connection string (not REST API). From Neon: Connect → **Connection string** → copy. Must look like `postgresql://user:password@host/db?sslmode=require` | Yes |
+| `DATABASE_URL` | Supabase **Postgres** connection string. From Supabase: **Settings → Database → Connection string** (URI). Must look like `postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres` | Yes |
 | `JWT_SECRET` | Long random string (e.g. 32+ chars). Same value everywhere (Render + local). | Yes |
 | `NODE_ENV` | `production` | Recommended |
 | `PORT` | Leave **empty** – Render sets it. | No |
@@ -15,8 +15,8 @@ In **Render Dashboard** → your **Web Service** → **Environment**, add:
 
 **Important**
 
-- `DATABASE_URL` must be the **Postgres** connection string (starts with `postgresql://`), not the Neon REST/API URL (`https://...apirest...`).
-- Use the **pooled** connection string from Neon (hostname contains `-pooler`) when available.
+- `DATABASE_URL` must be the **Postgres** connection string (starts with `postgresql://`), not the Supabase REST/API URL (`https://...supabase.co/rest/...`).
+- Use the **pooled** connection string from Supabase (Transaction mode) for best performance.
 - Do not use quotes or `psql` in the value.
 
 ---
@@ -107,7 +107,7 @@ Replace with your actual Render URL (e.g. `https://expense-tracker-xxxx.onrender
 | CORS error | Frontend origin not allowed | Set `CORS_ORIGIN` to your frontend URL, or leave empty to allow any. |
 | 401 Invalid token | Wrong/missing header or expired token | Use header `Authorization: Bearer <token>`; re-login if expired. |
 | 502 Bad Gateway | App crash or not listening on PORT | Check Render logs; ensure `PORT` is not set in env (Render sets it). |
-| Database connection failed | Wrong `DATABASE_URL` or REST URL | Use Postgres connection string from Neon (Connection string), not REST API URL. |
+| Database connection failed | Wrong `DATABASE_URL` or REST URL | Use Postgres connection string from Supabase (Settings → Database), not REST API URL. |
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## What changed
 
-- **Removed:** `@neondatabase/serverless` (was causing "Unexpected server response: 404" on Render).
+- **Removed:** `@neondatabase/serverless` (was causing "Unexpected server response: 404" on Render). Now using Supabase PostgreSQL.
 - **Using:** `pg` (node-postgres) with a single `Pool`, SSL, and `process.env.DATABASE_URL`.
 
 ## Render environment variables
@@ -11,17 +11,17 @@ Set these in **Render Dashboard → Your Web Service → Environment**:
 
 | Key | Value | Required |
 |-----|--------|----------|
-| `DATABASE_URL` | Neon **Postgres** connection string, e.g. `postgresql://user:password@ep-xxx-pooler.region.aws.neon.tech/dbname?sslmode=require` | Yes |
+| `DATABASE_URL` | Supabase **Postgres** connection string, e.g. `postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres` | Yes |
 | `JWT_SECRET` | Long random string (e.g. 32+ chars) | Yes |
 | `NODE_ENV` | `production` | Recommended |
 | `PORT` | Leave **empty** (Render sets it) | No |
 | `CORS_ORIGIN` | Your frontend URL, or leave empty to allow any | No |
 
-**Important:** `DATABASE_URL` must be the **Connection string** from Neon (starts with `postgresql://`), not the REST/API URL.
+**Important:** `DATABASE_URL` must be the **Connection string** from Supabase (starts with `postgresql://`), not the REST/API URL.
 
-## SQL schema (for Neon)
+## SQL schema (for Supabase)
 
-Run in **Neon SQL Editor** or via `npm run db:setup` (with same `DATABASE_URL` in `.env`). Contents of `database/schema.sql`:
+Run in **Supabase SQL Editor** or via `npm run db:setup` (with same `DATABASE_URL` in `.env`). Contents of `database/schema.sql`:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

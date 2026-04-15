@@ -1,11 +1,11 @@
 # Expense Tracker API
 
-Production-ready Node.js backend for an Expense Tracker web application. Built with Express, PostgreSQL (Neon), JWT auth, and MVC architecture.
+Production-ready Node.js backend for an Expense Tracker web application. Built with Express, PostgreSQL (Supabase), JWT auth, and MVC architecture.
 
 ## Tech Stack
 
 - **Node.js** + **Express.js**
-- **PostgreSQL** (Neon)
+- **PostgreSQL** (Supabase)
 - **JWT** authentication, **bcrypt** password hashing
 - **dotenv**, **pg** (node-postgres), **uuid**
 - **MVC** (models, controllers, routes, middleware, utils)
@@ -15,7 +15,7 @@ Production-ready Node.js backend for an Expense Tracker web application. Built w
 ## Prerequisites
 
 - Node.js 18+ 
-- PostgreSQL database (e.g. [Neon](https://neon.tech))
+- PostgreSQL database (e.g. [Supabase](https://supabase.com))
 - npm or yarn
 
 ---
@@ -33,16 +33,16 @@ This installs: `express`, `pg`, `bcrypt`, `jsonwebtoken`, `dotenv`, `uuid`, `nod
 
 ## 2. Database Setup
 
-1. Create a project and database on [Neon](https://neon.tech) (or use your existing one).
-2. Copy the connection string and set a password.
-3. Run the schema in the Neon SQL Editor (or with `psql`):
+1. Create a project and database on [Supabase](https://supabase.com) (or use your existing one).
+2. Go to **Settings → Database** and copy the connection string (URI format).
+3. Run the schema in the Supabase SQL Editor (or with `psql`):
 
 ```bash
-# Option A: In Neon dashboard → SQL Editor, paste and run contents of:
+# Option A: In Supabase dashboard → SQL Editor, paste and run contents of:
 # database/schema.sql
 
 # Option B: Using psql (if you have it)
-psql "postgresql://USER:PASSWORD@HOST/DB?sslmode=require" -f database/schema.sql
+psql "postgresql://postgres.[project-ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres" -f database/schema.sql
 ```
 
 ---
@@ -55,7 +55,7 @@ cp .env.example .env
 
 Edit `.env` and set:
 
-- **DATABASE_URL** – Your Neon connection string (replace `YOUR_NEW_PASSWORD_HERE` with the real password).
+- **DATABASE_URL** – Your Supabase PostgreSQL connection string (from Settings → Database).
 - **JWT_SECRET** – A long random string (e.g. run `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
 - **PORT** (optional) – Default is `5000`.
 
@@ -104,7 +104,7 @@ In the service → **Environment** tab, add:
 
 | Key            | Value |
 |----------------|--------|
-| `DATABASE_URL` | Your Neon connection string (with real password) |
+| `DATABASE_URL` | Your Supabase PostgreSQL connection string |
 | `JWT_SECRET`   | Strong random secret (e.g. 32+ char hex) |
 | `NODE_ENV`     | `production` |
 | `PORT`         | Leave empty (Render sets it automatically) |
@@ -123,7 +123,7 @@ Save. Render will redeploy if needed.
 ### Notes for Render
 
 - **Free tier:** Service may sleep after inactivity; first request can be slow.
-- **Neon:** Use the **pooled** connection string (often `-pooler` in hostname) for serverless/background workers.
+- **Supabase:** Use the **pooled** connection string (Transaction mode) for best performance.
 - Keep **JWT_SECRET** and **DATABASE_URL** only in Render env vars, never in the repo.
 
 ---
@@ -185,9 +185,9 @@ server.js       – app entry point
 
 - **Auth:** Register, Login, Get current user (`/api/auth/*`).
 - **Transactions:** CRUD + list with filters (type, category, date) (`/api/transactions/*`).
-- **Dashboard:** Balance, income, expense, monthly/today expense (`/api/dashboard`).
+- **Dashboard:** Balance, income, expense, monthly/today income & expense (`/api/dashboard`).
 - **Budget:** Set monthly budget, get status with 80% warning (`/api/budget/*`).
-- **Analytics:** Category expense, monthly spending, last 7 days (`/api/analytics/*`).
+- **Analytics:** Category expense/income, monthly spending/income, summary, last 7 days (`/api/analytics/*`).
 - **Categories:** CRUD for user categories (`/api/categories/*`).
 
 See **docs/API_ENDPOINTS.md** for the full list and **docs/POSTMAN_EXAMPLES.md** for request examples.

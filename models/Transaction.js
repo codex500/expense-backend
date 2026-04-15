@@ -152,6 +152,26 @@ async function expenseByCategory(userId, startDate = null, endDate = null) {
 }
 
 /**
+ * Get income by category for a user (for pie chart)
+ */
+async function incomeByCategory(userId, startDate = null, endDate = null) {
+  let query = `SELECT category, COALESCE(SUM(amount), 0) AS total
+               FROM transactions WHERE user_id = $1 AND type = 'income'`;
+  const params = [userId];
+  if (startDate) {
+    params.push(startDate);
+    query += ` AND transaction_date >= $${params.length}`;
+  }
+  if (endDate) {
+    params.push(endDate);
+    query += ` AND transaction_date <= $${params.length}`;
+  }
+  query += ' GROUP BY category ORDER BY total DESC';
+  const result = await pool.query(query, params);
+  return result.rows.map((r) => ({ category: r.category || 'Uncategorized', total: parseFloat(r.total) }));
+}
+
+/**
  * Get monthly spending (for graph) - last N months
  */
 async function monthlySpending(userId, months = 12) {
@@ -167,6 +187,48 @@ async function monthlySpending(userId, months = 12) {
     month: r.month.toISOString().slice(0, 7),
     total: parseFloat(r.total),
   }));
+}
+
+/**
+ * Get monthly income (for graph) - last N months
+ */
+async function monthlyIncome(userId, months = 12) {
+  const result = await pool.query(
+    `SELECT DATE_TRUNC('month', transaction_date) AS month, COALESCE(SUM(amount), 0) AS total
+     FROM transactions WHERE user_id = $1 AND type = 'income'
+     AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' * $2
+     GROUP BY DATE_TRUNC('month', transaction_date)
+     ORDER BY month ASC`,
+    [userId, months]
+  );
+  return result.rows.map((r) => ({
+    month: r.month.toISOString().slice(0, 7),
+    total: parseFloat(r.total),
+  }));
+}
+
+/**
+ * Get monthly summary (income + expense per month) - last N months
+ */
+async function monthlySummary(userId, months = 12) {
+  const result = await pool.query(
+    `SELECT DATE_TRUNC('month', transaction_date) AS month,
+            type,
+            COALESCE(SUM(amount), 0) AS total
+     FROM transactions WHERE user_id = $1
+     AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' * $2
+     GROUP BY DATE_TRUNC('month', transaction_date), type
+     ORDER BY month ASC`,
+    [userId, months]
+  );
+  // Group by month, combine income/expense
+  const monthMap = {};
+  for (const r of result.rows) {
+    const key = r.month.toISOString().slice(0, 7);
+    if (!monthMap[key]) monthMap[key] = { month: key, income: 0, expense: 0 };
+    monthMap[key][r.type] = parseFloat(r.total);
+  }
+  return Object.values(monthMap);
 }
 
 /**
@@ -186,6 +248,23 @@ async function last7DaysSpending(userId) {
   }));
 }
 
+/**
+ * Last 7 days income per day
+ */
+async function last7DaysIncome(userId) {
+  const result = await pool.query(
+    `SELECT transaction_date::date AS day, COALESCE(SUM(amount), 0) AS total
+     FROM transactions WHERE user_id = $1 AND type = 'income'
+     AND transaction_date >= CURRENT_DATE - INTERVAL '7 days'
+     GROUP BY transaction_date::date ORDER BY day ASC`,
+    [userId]
+  );
+  return result.rows.map((r) => ({
+    day: r.day.toISOString().slice(0, 10),
+    total: parseFloat(r.total),
+  }));
+}
+
 module.exports = {
   create,
   findByIdAndUser,
@@ -195,6 +274,10 @@ module.exports = {
   totalIncome,
   totalExpense,
   expenseByCategory,
+  incomeByCategory,
   monthlySpending,
+  monthlyIncome,
+  monthlySummary,
   last7DaysSpending,
+  last7DaysIncome,
 };

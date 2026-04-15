@@ -1,5 +1,5 @@
 -- Trackify - Database migrations for new features
--- Run this in Neon SQL Editor or via psql
+-- Run this in Supabase SQL Editor or via psql
 
 -- 1. Email logs table (for tracking daily emails)
 CREATE TABLE IF NOT EXISTS email_logs (

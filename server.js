@@ -1,6 +1,6 @@
 /**
  * Expense Tracker API - Entry point
- * Production-ready for Render + Neon PostgreSQL
+ * Production-ready for Render + Supabase PostgreSQL
  */
 
 require('dotenv').config();
