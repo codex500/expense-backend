@@ -23,7 +23,7 @@ Production-ready Node.js backend for an Expense Tracker web application. Built w
 ## 1. Install Dependencies
 
 ```bash
-cd "c:\Users\dj960\OneDrive\Documents\expense tracker"
+cd expense-backend
 npm install
 ```
 

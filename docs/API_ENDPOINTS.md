@@ -37,7 +37,7 @@ All protected routes require header: `Authorization: Bearer <token>`
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/dashboard` | Yes | Total balance, income, expense, monthly expense, today's expense |
+| GET | `/api/dashboard` | Yes | Total balance, income, expense, monthly income/expense, today's income/expense |
 
 ---
 
@@ -57,8 +57,12 @@ All protected routes require header: `Authorization: Bearer <token>`
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/api/analytics/category-expense` | Yes | Category-wise expense (pie chart). Optional: ?startDate=&endDate= |
+| GET | `/api/analytics/category-income` | Yes | Category-wise income (pie chart). Optional: ?startDate=&endDate= |
 | GET | `/api/analytics/monthly-spending` | Yes | Monthly spending (graph). Optional: ?months=12 |
-| GET | `/api/analytics/last-7-days` | Yes | Last 7 days spending per day |
+| GET | `/api/analytics/monthly-income` | Yes | Monthly income (graph). Optional: ?months=12 |
+| GET | `/api/analytics/monthly-summary` | Yes | Income + expense per month. Optional: ?months=12 |
+| GET | `/api/analytics/last-7-days` | Yes | Last 7 days spending + income per day |
+| GET | `/api/analytics/weekly` | Yes | Weekly spending/income with highest/lowest day analysis |
 
 ---
 

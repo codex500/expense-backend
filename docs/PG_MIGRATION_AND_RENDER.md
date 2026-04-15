@@ -2,7 +2,7 @@
 
 ## What changed
 
-- **Removed:** `@neondatabase/serverless` (was causing "Unexpected server response: 404" on Render). Now using Supabase PostgreSQL.
+- **Removed:** Old serverless database driver (was causing "Unexpected server response: 404" on Render). Now using Supabase PostgreSQL.
 - **Using:** `pg` (node-postgres) with a single `Pool`, SSL, and `process.env.DATABASE_URL`.
 
 ## Render environment variables
