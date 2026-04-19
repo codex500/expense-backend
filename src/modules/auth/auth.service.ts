@@ -474,20 +474,7 @@ export class AuthService {
     const userEmail = rows[0]?.email;
     const userName = rows[0]?.full_name || 'User';
 
-    // 2. Start a transaction to delete from DB
-    await withTransaction(async (client) => {
-      // We'll delete directly from user_profiles. Due to ON DELETE CASCADE on all tables,
-      // this will wipe accounts, transactions, budgets, salary_entries, etc.
-      await client.query(`DELETE FROM user_profiles WHERE id = $1`, [userId]);
-    });
-
-    // 3. Delete user from Supabase Auth
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    if (error) {
-      console.warn('[Auth] Failed to delete user from Supabase Auth:', error.message);
-    }
-
-    // 4. Send goodbye email
+    // 2. Send goodbye email first (before DB connections or auth invalidation)
     if (userEmail) {
       const { emailService } = await import('../emails/emails.service');
       const { getBaseTemplate } = await import('../../templates/base');
@@ -506,6 +493,18 @@ export class AuthService {
       `;
       const html = getBaseTemplate('Account Deleted', content);
       await emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html);
+    }
+
+    // 3. Start a transaction to delete from DB
+    await withTransaction(async (client) => {
+      // Due to ON DELETE CASCADE on all tables, this will wipe everything.
+      await client.query(`DELETE FROM user_profiles WHERE id = $1`, [userId]);
+    });
+
+    // 4. Delete user from Supabase Auth
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) {
+      console.warn('[Auth] Failed to delete user from Supabase Auth:', error.message);
     }
 
     return { message: 'Account and all associated data successfully deleted.' };
