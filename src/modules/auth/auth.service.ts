@@ -294,7 +294,7 @@ export class AuthService {
   /**
    * Update user profile — only name, dob, mobile_number are editable.
    */
-  async updateProfile(userId: string, updates: { fullName?: string; dob?: string; mobileNumber?: string }) {
+  async updateProfile(userId: string, updates: { fullName?: string; dob?: string; mobileNumber?: string; gender?: string }) {
     const setClauses: string[] = [];
     const params: any[] = [];
     let idx = 1;
@@ -310,6 +310,10 @@ export class AuthService {
     if (updates.mobileNumber !== undefined) {
       setClauses.push(`mobile_number = $${idx++}`);
       params.push(updates.mobileNumber);
+    }
+    if (updates.gender !== undefined) {
+      setClauses.push(`gender = $${idx++}`);
+      params.push(updates.gender);
     }
 
     if (setClauses.length === 0) {
@@ -428,6 +432,23 @@ export class AuthService {
     }
 
     const profile = rows[0];
+    let decryptedPan = 'Not provided';
+    if (profile.pan_card) {
+      try {
+        const crypto = await import('crypto');
+        const [ivHex, encryptedHex] = profile.pan_card.split(':');
+        const iv = Buffer.from(ivHex, 'hex');
+        const key = crypto.createHash('sha256').update(env.JWT_SECRET).digest('base64').substring(0, 32);
+        const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
+        let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        decryptedPan = decrypted;
+      } catch (err) {
+        console.warn('[Auth] Error decrypting PAN:', err);
+        decryptedPan = 'Error decrypting';
+      }
+    }
+
     return {
       id: profile.id,
       email: profile.email,
@@ -435,6 +456,7 @@ export class AuthService {
       dob: profile.dob,
       gender: profile.gender,
       mobileNumber: profile.mobile_number,
+      panCard: decryptedPan,
       avatarUrl: profile.avatar_url,
       defaultCurrency: profile.default_currency,
       themePreference: profile.theme_preference,

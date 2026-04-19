@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   full_name         VARCHAR(255) NOT NULL DEFAULT '',
   avatar_url        TEXT,
   phone             VARCHAR(20),
+  mobile_number     VARCHAR(20),
+  dob               DATE,
+  gender            VARCHAR(20),
+  pan_card          TEXT,
 
   -- Preferences
   default_currency  VARCHAR(10) NOT NULL DEFAULT 'INR',
