@@ -31,5 +31,6 @@ router.post('/logout', authenticate as any, (req, res, next) => authController.l
 router.get('/session', authenticate as any, (req, res, next) => authController.getSession(req as any, res, next));
 router.post('/onboarding', authenticate as any, validate({ body: onboardingSchema }), (req, res, next) => authController.completeOnboarding(req as any, res, next));
 router.put('/profile', authenticate as any, (req, res, next) => authController.updateProfile(req as any, res, next));
+router.delete('/account', authenticate as any, (req, res, next) => authController.deleteAccount(req as any, res, next));
 
 export default router;

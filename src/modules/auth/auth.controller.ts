@@ -92,6 +92,13 @@ export class AuthController {
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
+
+  async deleteAccount(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.deleteAccount(req.user.id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
 }
 
 export const authController = new AuthController();

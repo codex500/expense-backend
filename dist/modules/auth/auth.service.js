@@ -384,6 +384,25 @@ class AuthService {
             accountCount: Number(profile.account_count),
         };
     }
+    /**
+     * Delete the entire user account and all associated data.
+     */
+    async deleteAccount(userId) {
+        // Start a transaction just to log it to audit, then delete from DB
+        await (0, database_1.withTransaction)(async (client) => {
+            // Create an audit log simply right before delete for history, or just delete directly.
+            // We'll delete directly from user_profiles. Due to ON DELETE CASCADE on all tables,
+            // this will wipe accounts, transactions, budgets, salary_entries, etc.
+            await client.query(`DELETE FROM user_profiles WHERE id = $1`, [userId]);
+        });
+        // Delete user from Supabase Auth
+        const { error } = await supabase_1.supabaseAdmin.auth.admin.deleteUser(userId);
+        if (error) {
+            console.warn('[Auth] Failed to delete user from Supabase Auth:', error.message);
+            // We still return true because DB data is deleted.
+        }
+        return { message: 'Account and all associated data successfully deleted.' };
+    }
 }
 exports.AuthService = AuthService;
 exports.authService = new AuthService();

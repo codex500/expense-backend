@@ -115,6 +115,12 @@ export declare class AuthService {
         emailVerified: any;
         accountCount: number;
     }>;
+    /**
+     * Delete the entire user account and all associated data.
+     */
+    deleteAccount(userId: string): Promise<{
+        message: string;
+    }>;
 }
 export declare const authService: AuthService;
 //# sourceMappingURL=auth.service.d.ts.map

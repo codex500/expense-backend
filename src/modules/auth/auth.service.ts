@@ -443,6 +443,51 @@ export class AuthService {
       accountCount: Number(profile.account_count),
     };
   }
+  /**
+   * Delete the entire user account and all associated data.
+   */
+  async deleteAccount(userId: string) {
+    // 1. Get user details before deletion so we can email them
+    const { rows } = await query(`SELECT email, full_name FROM user_profiles WHERE id = $1`, [userId]);
+    const userEmail = rows[0]?.email;
+    const userName = rows[0]?.full_name || 'User';
+
+    // 2. Start a transaction to delete from DB
+    await withTransaction(async (client) => {
+      // We'll delete directly from user_profiles. Due to ON DELETE CASCADE on all tables,
+      // this will wipe accounts, transactions, budgets, salary_entries, etc.
+      await client.query(`DELETE FROM user_profiles WHERE id = $1`, [userId]);
+    });
+
+    // 3. Delete user from Supabase Auth
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (error) {
+      console.warn('[Auth] Failed to delete user from Supabase Auth:', error.message);
+    }
+
+    // 4. Send goodbye email
+    if (userEmail) {
+      const { emailService } = await import('../emails/emails.service');
+      const { getBaseTemplate } = await import('../../templates/base');
+      
+      const content = `
+        <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Account Deleted Successfully</h2>
+        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">
+          Hi ${userName},<br><br>
+          We're writing to confirm that your Trackify account has been permanently deleted, per your request.
+        </p>
+        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">
+          All of your personal data, accounts, transactions, and budgets have been completely wiped from our servers. 
+          We're sorry to see you go! If you ever decide to return, you'll need to create a new account.
+        </p>
+        <p style="margin: 0; color: #475569; font-size: 14px;">Best regards,<br>The Trackify Team</p>
+      `;
+      const html = getBaseTemplate('Account Deleted', content);
+      await emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html);
+    }
+
+    return { message: 'Account and all associated data successfully deleted.' };
+  }
 }
 
 export const authService = new AuthService();

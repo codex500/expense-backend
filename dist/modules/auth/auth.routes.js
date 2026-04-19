@@ -23,5 +23,6 @@ router.post('/logout', authenticate_1.authenticate, (req, res, next) => auth_con
 router.get('/session', authenticate_1.authenticate, (req, res, next) => auth_controller_1.authController.getSession(req, res, next));
 router.post('/onboarding', authenticate_1.authenticate, (0, validate_1.validate)({ body: auth_validation_1.onboardingSchema }), (req, res, next) => auth_controller_1.authController.completeOnboarding(req, res, next));
 router.put('/profile', authenticate_1.authenticate, (req, res, next) => auth_controller_1.authController.updateProfile(req, res, next));
+router.delete('/account', authenticate_1.authenticate, (req, res, next) => auth_controller_1.authController.deleteAccount(req, res, next));
 exports.default = router;
 //# sourceMappingURL=auth.routes.js.map

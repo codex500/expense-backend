@@ -15,6 +15,7 @@ export declare class AuthController {
     getOAuthUrl(req: Request, res: Response, next: NextFunction): Promise<void>;
     completeOnboarding(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
     getSession(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
+    deleteAccount(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void>;
 }
 export declare const authController: AuthController;
 //# sourceMappingURL=auth.controller.d.ts.map
