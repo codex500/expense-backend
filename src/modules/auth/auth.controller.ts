@@ -34,8 +34,7 @@ export class AuthController {
 
   async forgotPassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const baseUrl = env.IS_PRODUCTION ? env.APP_URL : env.CORS_ORIGIN;
-      const redirectUrl = `${baseUrl}`;
+      const redirectUrl = env.APP_URL;
       const result = await authService.forgotPassword(req.body.email, redirectUrl);
       sendSuccess(res, result);
     } catch (err) { next(err); }

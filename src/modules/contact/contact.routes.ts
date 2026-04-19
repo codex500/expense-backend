@@ -29,8 +29,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
        </div>`
     );
 
-    // Send to admin email (the one configured as MAIL_FROM or SMTP_EMAIL or explicitly admin)
-    await emailService.sendEmail(env.MAIL_FROM, `Support Request: ${subject}`, adminHtml);
+    // Send to admin email (the actual inbox, not the noreply sender)
+    await emailService.sendEmail(env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml);
 
     // 2. Send Acknowledgement to User
     const userHtml = getBaseTemplate(

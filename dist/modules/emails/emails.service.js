@@ -28,30 +28,41 @@ class EmailService {
      * Checks if sending this email violates rate limits.
      */
     async canSendEmail(userId, emailType) {
-        // Check daily limit
-        const { rows: dailyRows } = await (0, database_1.query)(`SELECT COUNT(*) as cnt FROM email_logs 
-             WHERE user_id = $1 AND sent_at >= CURRENT_DATE`, [userId]);
-        if (Number(dailyRows[0].cnt) >= env_1.env.MAX_EMAILS_PER_USER_PER_DAY) {
-            return false;
-        }
-        // Check cooldown for same type
-        const { rows: cooldownRows } = await (0, database_1.query)(`SELECT sent_at FROM email_logs 
-             WHERE user_id = $1 AND email_type = $2
-             ORDER BY sent_at DESC LIMIT 1`, [userId, emailType]);
-        if (cooldownRows.length > 0) {
-            const hoursSinceLast = (new Date().getTime() - new Date(cooldownRows[0].sent_at).getTime()) / (1000 * 60 * 60);
-            if (hoursSinceLast < env_1.env.EMAIL_COOLDOWN_HOURS) {
+        try {
+            // Check daily limit
+            const { rows: dailyRows } = await (0, database_1.query)(`SELECT COUNT(*) as cnt FROM email_logs 
+                 WHERE user_id = $1 AND sent_at >= CURRENT_DATE`, [userId]);
+            if (Number(dailyRows[0].cnt) >= env_1.env.MAX_EMAILS_PER_USER_PER_DAY) {
                 return false;
             }
+            // Check cooldown for same type
+            const { rows: cooldownRows } = await (0, database_1.query)(`SELECT sent_at FROM email_logs 
+                 WHERE user_id = $1 AND email_type = $2
+                 ORDER BY sent_at DESC LIMIT 1`, [userId, emailType]);
+            if (cooldownRows.length > 0) {
+                const hoursSinceLast = (new Date().getTime() - new Date(cooldownRows[0].sent_at).getTime()) / (1000 * 60 * 60);
+                if (hoursSinceLast < env_1.env.EMAIL_COOLDOWN_HOURS) {
+                    return false;
+                }
+            }
+            return true;
         }
-        return true;
+        catch (error) {
+            console.warn('[EmailService] canSendEmail check failed (table may not exist):', error.message);
+            return true; // Allow sending if we can't check
+        }
     }
     async logEmail(userId, emailType) {
-        await (0, database_1.query)(`INSERT INTO email_logs (user_id, email_type) VALUES ($1, $2)`, [userId, emailType]);
+        try {
+            await (0, database_1.query)(`INSERT INTO email_logs (user_id, email_type) VALUES ($1, $2)`, [userId, emailType]);
+        }
+        catch (error) {
+            console.warn('[EmailService] logEmail failed:', error.message);
+        }
     }
     async sendEmail(to, subject, html) {
-        if (!env_1.env.SMTP_HOST || !env_1.env.SMTP_PASSWORD) {
-            console.warn('[EmailService] SMTP not configured. Skipping email to', to);
+        if (!env_1.env.SMTP_HOST || !env_1.env.SMTP_PASSWORD || !env_1.env.MAIL_FROM) {
+            console.warn('[EmailService] SMTP not fully configured. Missing:', !env_1.env.SMTP_HOST ? 'SMTP_HOST' : '', !env_1.env.SMTP_PASSWORD ? 'SMTP_PASSWORD' : '', !env_1.env.MAIL_FROM ? 'MAIL_FROM' : '');
             return false;
         }
         try {
@@ -61,10 +72,11 @@ class EmailService {
                 subject,
                 html,
             });
+            console.log(`[EmailService] ✅ Email sent to ${to}: ${subject}`);
             return true;
         }
         catch (error) {
-            console.error('[EmailService] Send error:', error);
+            console.error('[EmailService] ❌ Send error to', to, ':', error.message || error);
             return false;
         }
     }

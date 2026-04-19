@@ -143,7 +143,7 @@ export class AuthService {
   async forgotPassword(email: string, redirectUrl: string) {
     try {
       // redirect_to points to frontend root — AppWrapper intercepts the hash and routes to /reset-password
-      const frontendUrl = redirectUrl || env.CORS_ORIGIN || 'http://localhost:5173';
+      const frontendUrl = redirectUrl || env.APP_URL;
       const { data, error } = await supabaseAdmin.auth.admin.generateLink({
         type: 'recovery',
         email,

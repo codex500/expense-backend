@@ -33,9 +33,8 @@ app.use((0, cors_1.default)({
     origin: function (origin, callback) {
         if (!origin)
             return callback(null, true);
-        const allowed = env_1.env.CORS_ORIGIN.split(',').map(o => o.trim());
-        const isDev = env_1.env.NODE_ENV !== 'production';
-        if (allowed.includes(origin) || origin === env_1.env.APP_URL || (isDev && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')))) {
+        const allowed = env_1.env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
+        if (allowed.includes(origin) || origin === env_1.env.APP_URL) {
             return callback(null, true);
         }
         callback(new Error('Not allowed by CORS'));

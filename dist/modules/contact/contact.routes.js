@@ -23,8 +23,8 @@ router.post('/', async (req, res, next) => {
        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 15px;">
          <p style="margin: 0; color: #334155; white-space: pre-wrap;">${message}</p>
        </div>`);
-        // Send to admin email (the one configured as MAIL_FROM or SMTP_EMAIL or explicitly admin)
-        await emails_service_1.emailService.sendEmail(env_1.env.MAIL_FROM, `Support Request: ${subject}`, adminHtml);
+        // Send to admin email (the actual inbox, not the noreply sender)
+        await emails_service_1.emailService.sendEmail(env_1.env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml);
         // 2. Send Acknowledgement to User
         const userHtml = (0, base_1.getBaseTemplate)('Support Request Received', `<h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Hi ${name},</h2>
        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">

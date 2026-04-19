@@ -32,7 +32,7 @@ exports.env = {
     // Server
     PORT: optionalInt('PORT', 5000),
     NODE_ENV: optional('NODE_ENV', 'development'),
-    APP_URL: optional('APP_URL', 'http://localhost:3000'),
+    APP_URL: required('APP_URL'),
     IS_PRODUCTION: optional('NODE_ENV', 'development') === 'production',
     // Database
     DATABASE_URL: required('DATABASE_URL'),
@@ -49,9 +49,9 @@ exports.env = {
     SMTP_PORT: optionalInt('SMTP_PORT', 587),
     SMTP_EMAIL: optional('SMTP_EMAIL', ''),
     SMTP_PASSWORD: optional('SMTP_PASSWORD', ''),
-    MAIL_FROM: optional('MAIL_FROM', 'Trackify <noreply@trackifyapp.space>'),
+    MAIL_FROM: optional('MAIL_FROM', ''),
     // CORS
-    CORS_ORIGIN: optional('CORS_ORIGIN', '*'),
+    CORS_ORIGIN: optional('CORS_ORIGIN', ''),
     // Rate Limiting
     RATE_LIMIT_WINDOW_MS: optionalInt('RATE_LIMIT_WINDOW_MS', 900_000),
     RATE_LIMIT_MAX: optionalInt('RATE_LIMIT_MAX', 100),
