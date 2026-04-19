@@ -13,6 +13,7 @@ import { query, withTransaction } from '../../config/database';
 import { NotFoundError, BadRequestError, InsufficientBalanceError } from '../../shared/errors';
 import { canDeduct } from '../../shared/utils/money';
 import { buildPaginationMeta } from '../../shared/utils/response';
+import PDFDocument from 'pdfkit';
 import { CreateTransactionInput, UpdateTransactionInput, TransactionQuery } from './transactions.validation';
 import { PaginationMeta } from '../../shared/types';
 import { PoolClient } from 'pg';
@@ -304,6 +305,125 @@ export class TransactionsService {
       transactions: rows.map(this.formatTransaction),
       meta,
     };
+  }
+
+  async exportPdf(userId: string, res: any) {
+    const { rows: [user] } = await query('SELECT email, full_name, dob FROM user_profiles WHERE id = $1', [userId]);
+    if (!user) throw new NotFoundError('User not found.');
+
+    const dobStr = user.dob instanceof Date ? user.dob.toISOString().split('T')[0] : (typeof user.dob === 'string' ? user.dob : '1970-01-01');
+    const dobParts = dobStr.split('-');
+    const dobString = `${dobParts[2]}${dobParts[1]}${dobParts[0]}`;
+    
+    const rawName = user.full_name || user.email.split('@')[0];
+    const namePrefix = rawName.replace(/[^a-zA-Z0-9]/g, '').substring(0, 4).toUpperCase();
+    
+    // Fallback if name length is less than 4
+    const paddedNamePrefix = namePrefix.padEnd(4, 'X');
+    const userPassword = `${dobString}${paddedNamePrefix}`;
+
+    const { rows: txns } = await query(
+      `SELECT t.*, a.account_name 
+       FROM transactions t
+       LEFT JOIN accounts a ON t.account_id = a.id
+       WHERE t.user_id = $1
+       ORDER BY t.transaction_date DESC, t.created_at DESC`,
+      [userId]
+    );
+
+    const doc = new PDFDocument({
+      margin: 50,
+      size: 'A4',
+      userPassword,
+      ownerPassword: userPassword,
+      permissions: { printing: 'highResolution', modifying: false, copying: false }
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename=transactions_history.pdf');
+    
+    doc.pipe(res);
+
+    // --- Helper for Footer ---
+    const addFooter = () => {
+      doc.fontSize(9)
+         .fillColor('#94a3b8')
+         .text(
+           '© All copyrights are reserved by PixoraLabz.tech',
+           50,
+           doc.page.height - 50,
+           { align: 'center', width: doc.page.width - 100 }
+         );
+    };
+
+    // --- Header ---
+    doc.fontSize(22).font('Helvetica-Bold').fillColor('#0f172a').text('TRACKIFY', 50, 50);
+    doc.fontSize(10).font('Helvetica').fillColor('#64748b').text('Premium Expense Tracking', 50, 75);
+    
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#0f172a').text('Transaction Report', 300, 55, { align: 'right', width: 245 });
+    doc.fontSize(10).font('Helvetica').fillColor('#64748b').text(`Date: ${new Date().toLocaleDateString('en-IN')}`, 300, 70, { align: 'right', width: 245 });
+
+    // Divider
+    doc.moveTo(50, 100).lineTo(545, 100).lineWidth(1).strokeColor('#e2e8f0').stroke();
+
+    // --- User Info block ---
+    doc.fontSize(10).font('Helvetica-Bold').fillColor('#334155').text('Generated For:', 50, 115);
+    doc.font('Helvetica').text(`${user.full_name || user.email}`, 50, 130);
+    if (user.full_name) doc.fillColor('#64748b').text(user.email, 50, 145);
+    doc.fillColor('#334155').text(`Total Records: ${txns.length}`, 300, 130, { align: 'right', width: 245 });
+
+    // --- Table Configuration ---
+    let y = 190;
+    const colX = { date: 50, details: 130, account: 330, amount: 450 };
+
+    // Table Header
+    doc.rect(50, y - 5, 495, 20).fill('#f1f5f9');
+    doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
+    doc.text('DATE', colX.date, y);
+    doc.text('CATEGORY / NOTE', colX.details, y);
+    doc.text('ACCOUNT', colX.account, y);
+    doc.text('AMOUNT (₹)', colX.amount, y, { width: 95, align: 'right' });
+    
+    y += 25;
+
+    // --- Table Data ---
+    doc.font('Helvetica');
+    txns.forEach((txn: any) => {
+      // Check for page break
+      if (y > doc.page.height - 100) {
+        addFooter();
+        doc.addPage();
+        y = 50;
+      }
+
+      const amountStr = (Number(txn.amount_paise) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2});
+      const dateStr = new Date(txn.transaction_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      const acct = txn.account_name || 'Unknown Account';
+      const cat = (txn.category || 'Uncategorized').toUpperCase();
+      const note = txn.note ? txn.note.substring(0, 30) : '';
+
+      doc.fontSize(9).fillColor('#64748b').text(dateStr, colX.date, y);
+      
+      doc.fillColor('#0f172a').text(cat, colX.details, y);
+      if (note) {
+        doc.fontSize(8).fillColor('#94a3b8').text(note, colX.details, y + 12);
+      }
+
+      doc.fontSize(9).fillColor('#64748b').text(acct, colX.account, y);
+
+      const color = txn.type === 'income' ? '#10b981' : '#ef4444';
+      const sign = txn.type === 'income' ? '+' : '-';
+      doc.font('Helvetica-Bold').fillColor(color).text(`${sign} ${amountStr}`, colX.amount, y, { width: 95, align: 'right' });
+
+      // Move Y down - extra space if note exists
+      y += (note ? 30 : 20);
+      
+      // Row divider
+      doc.moveTo(50, y - 5).lineTo(545, y - 5).lineWidth(0.5).strokeColor('#f1f5f9').stroke();
+    });
+
+    addFooter();
+    doc.end();
   }
 
   private formatTransaction(row: any) {

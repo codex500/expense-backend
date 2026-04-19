@@ -34,23 +34,39 @@ export class AuthController {
 
   async forgotPassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const redirectUrl = `${env.APP_URL}/reset-password`;
+      const baseUrl = env.IS_PRODUCTION ? env.APP_URL : env.CORS_ORIGIN;
+      const redirectUrl = `${baseUrl}`;
       const result = await authService.forgotPassword(req.body.email, redirectUrl);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async resetPassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async resetPassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const token = req.headers.authorization?.slice(7) || '';
-      const result = await authService.resetPassword(token, req.body.password);
+      const { accessToken, password } = req.body;
+      const result = await authService.resetPassword(accessToken, password);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async resendVerification(req: Request, res: Response, next: NextFunction) {
+  async verifyOtp(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await authService.resendVerification(req.body.email);
+      const { email, otp } = req.body;
+      const result = await authService.verifyOtp(email, otp);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async resendOtp(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.resendOtp(req.body.email);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async updateProfile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await authService.updateProfile(req.user.id, req.body);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }

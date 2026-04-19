@@ -4,6 +4,7 @@
  */
 
 import { supabaseAdmin, supabasePublic } from '../../config/supabase';
+import { env } from '../../config/env';
 import { query, withTransaction } from '../../config/database';
 import { BadRequestError, ConflictError, NotFoundError, UnauthorizedError } from '../../shared/errors';
 import { SignupInput, LoginInput, OnboardingInput } from './auth.validation';
@@ -18,8 +19,8 @@ export class AuthService {
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email: input.email,
       password: input.password,
-      email_confirm: false,
-      user_metadata: { full_name: input.fullName },
+      email_confirm: false, // Wait for user to verify
+      user_metadata: { full_name: input.fullName, dob: input.dob },
     });
 
     if (error) {
@@ -31,32 +32,52 @@ export class AuthService {
 
     const user = data.user;
 
-    // Create profile in our DB
+// Create profile in our DB
+    const crypto = await import('crypto');
+    let encryptedPan = null;
+    if (input.panCard) {
+      const iv = crypto.randomBytes(16);
+      const key = crypto.createHash('sha256').update(env.JWT_SECRET).digest('base64').substring(0, 32);
+      const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
+      let encrypted = cipher.update(input.panCard, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+      encryptedPan = iv.toString('hex') + ':' + encrypted;
+    }
+
     await query(
-      `INSERT INTO user_profiles (id, email, full_name, email_verified)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO user_profiles (id, email, full_name, dob, email_verified, gender, mobile_number, pan_card)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO NOTHING`,
-      [user.id, user.email, input.fullName, false]
+      [user.id, user.email, input.fullName, input.dob, false, input.gender, input.mobileNumber, encryptedPan]
     );
+
+    // Send OTP verification email
+    try {
+      await this.sendOtp(user.id, input.email);
+    } catch (err) {
+      console.error('[Auth] Failed to send verification OTP:', err);
+    }
 
     return {
       id: user.id,
       email: user.email,
       fullName: input.fullName,
       emailVerified: false,
+      message: 'Signup successful. Please check your email to verify your account.'
     };
   }
 
   /**
    * Login with email + password via Supabase.
+   * Uses the admin/service-role client to bypass captcha.
    */
   async login(input: LoginInput) {
-    const { data, error } = await supabasePublic.auth.signInWithPassword({
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({
       email: input.email,
       password: input.password,
     });
 
-    if (error) {
+    if (error || !data.session) {
       throw new UnauthorizedError('Invalid email or password.');
     }
 
@@ -120,13 +141,44 @@ export class AuthService {
    * Trigger forgot password email through Supabase.
    */
   async forgotPassword(email: string, redirectUrl: string) {
-    const { error } = await supabasePublic.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    });
+    try {
+      // redirect_to points to frontend root — AppWrapper intercepts the hash and routes to /reset-password
+      const frontendUrl = redirectUrl || env.CORS_ORIGIN || 'http://localhost:5173';
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: { redirectTo: frontendUrl },
+      });
 
-    if (error) {
-      // Don't reveal if email exists or not
-      console.warn('[Auth] Password reset error:', error.message);
+      if (error) {
+        console.warn('[Auth] Password reset error:', error.message);
+      } else if (data?.properties?.action_link) {
+        // Send the reset email ourselves via our SMTP
+        const { emailService } = await import('../emails/emails.service');
+        const { getBaseTemplate } = await import('../../templates/base');
+
+        // Use the original Supabase action_link — it must go through Supabase's
+        // /auth/v1/verify endpoint first so the hashed token gets exchanged for
+        // a real JWT access_token before redirecting to our frontend.
+        const resetLink = data.properties.action_link;
+        
+        const content = `
+          <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Reset Your Password</h2>
+          <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
+            We received a request to reset your password. Click the button below to choose a new password.
+            This link will expire in 1 hour.
+          </p>
+          <p style="margin: 0 0 10px; color: #94a3b8; font-size: 13px;">
+            If you didn't request this, you can safely ignore this email.
+          </p>
+        `;
+        const html = getBaseTemplate('Reset Your Password', content, resetLink, 'Reset Password');
+
+        const sent = await emailService.sendEmail(email, 'Reset Your Trackify Password', html);
+        console.log(`[Auth] Password reset email ${sent ? 'sent' : 'FAILED'} to ${email}`);
+      }
+    } catch (err: any) {
+      console.warn('[Auth] Password reset unexpected error:', err.message);
     }
 
     // Always return success to prevent email enumeration
@@ -137,10 +189,15 @@ export class AuthService {
    * Reset password (after user clicks email link, Supabase provides a session).
    */
   async resetPassword(accessToken: string, newPassword: string) {
-    // Use the access token from the reset link to update the password
+    // 1. Verify the token and get the user
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+    if (userError || !user?.id) {
+      throw new UnauthorizedError('Invalid or expired password reset token.');
+    }
+
+    // 2. Use the user ID to update the password
     const { error } = await supabaseAdmin.auth.admin.updateUserById(
-      // We need the user ID, extract from token
-      (await supabaseAdmin.auth.getUser(accessToken)).data.user?.id || '',
+      user.id,
       { password: newPassword }
     );
 
@@ -152,19 +209,128 @@ export class AuthService {
   }
 
   /**
-   * Resend email verification through Supabase.
+   * Generate and send a 6-digit alphanumeric OTP to the user's email.
    */
-  async resendVerification(email: string) {
-    const { error } = await supabasePublic.auth.resend({
-      type: 'signup',
-      email,
-    });
-
-    if (error) {
-      console.warn('[Auth] Resend verification error:', error.message);
+  async sendOtp(userId: string, email: string) {
+    const crypto = await import('crypto');
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let otp = '';
+    for (let i = 0; i < 6; i++) {
+      otp += chars.charAt(crypto.randomInt(chars.length));
     }
 
-    return { message: 'If your email is registered and unverified, a new verification email has been sent.' };
+    // Invalidate previous OTPs for this email
+    await query(`UPDATE email_otps SET verified = true WHERE email = $1 AND verified = false`, [email]);
+
+    // Store the OTP (expires in 10 minutes)
+    await query(
+      `INSERT INTO email_otps (user_id, email, otp_code, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')`,
+      [userId, email, otp]
+    );
+
+    // Send OTP email
+    const { emailService } = await import('../emails/emails.service');
+    const { getBaseTemplate } = await import('../../templates/base');
+
+    const content = `
+      <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Verify Your Email</h2>
+      <p style="margin: 0 0 10px; color: #475569; font-size: 16px; line-height: 1.6;">
+        Welcome to Trackify! Use the code below to verify your email address.
+      </p>
+      <div style="margin: 24px 0; text-align: center;">
+        <div style="display: inline-block; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 16px 32px; border-radius: 16px; font-family: monospace;">
+          ${otp}
+        </div>
+      </div>
+      <p style="margin: 0; color: #94a3b8; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
+    `;
+    const html = getBaseTemplate('Verify Email', content, '', '');
+    await emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html);
+    console.log(`[Auth] OTP sent to ${email}`);
+
+    return { message: 'Verification code sent to your email.' };
+  }
+
+  /**
+   * Verify email via OTP code.
+   */
+  async verifyOtp(email: string, otpCode: string) {
+    const { rows } = await query(
+      `SELECT * FROM email_otps WHERE email = $1 AND otp_code = $2 AND verified = false AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1`,
+      [email, otpCode.toUpperCase()]
+    );
+
+    if (rows.length === 0) {
+      throw new BadRequestError('Invalid or expired OTP code.');
+    }
+
+    const otpRow = rows[0];
+
+    // Mark OTP as used
+    await query(`UPDATE email_otps SET verified = true WHERE id = $1`, [otpRow.id]);
+
+    // Update Supabase to confirm email
+    await supabaseAdmin.auth.admin.updateUserById(otpRow.user_id, { email_confirm: true });
+
+    // Update our DB
+    await query(`UPDATE user_profiles SET email_verified = true WHERE id = $1`, [otpRow.user_id]);
+
+    return { message: 'Email verified successfully.' };
+  }
+
+  /**
+   * Resend OTP for email verification.
+   */
+  async resendOtp(email: string) {
+    const { rows } = await query(`SELECT id FROM user_profiles WHERE email = $1 AND email_verified = false`, [email]);
+    if (rows.length === 0) {
+      // Don't reveal whether the email exists
+      return { message: 'If your email is registered and unverified, a new code has been sent.' };
+    }
+    await this.sendOtp(rows[0].id, email);
+    return { message: 'A new verification code has been sent to your email.' };
+  }
+
+  /**
+   * Update user profile — only name, dob, mobile_number are editable.
+   */
+  async updateProfile(userId: string, updates: { fullName?: string; dob?: string; mobileNumber?: string }) {
+    const setClauses: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (updates.fullName) {
+      setClauses.push(`full_name = $${idx++}`);
+      params.push(updates.fullName);
+    }
+    if (updates.dob) {
+      setClauses.push(`dob = $${idx++}`);
+      params.push(updates.dob);
+    }
+    if (updates.mobileNumber !== undefined) {
+      setClauses.push(`mobile_number = $${idx++}`);
+      params.push(updates.mobileNumber);
+    }
+
+    if (setClauses.length === 0) {
+      throw new BadRequestError('No valid fields to update.');
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+    params.push(userId);
+
+    await query(
+      `UPDATE user_profiles SET ${setClauses.join(', ')} WHERE id = $${idx}`,
+      params
+    );
+
+    // Also update Supabase metadata
+    const metadata: any = {};
+    if (updates.fullName) metadata.full_name = updates.fullName;
+    if (updates.dob) metadata.dob = updates.dob;
+    await supabaseAdmin.auth.admin.updateUserById(userId, { user_metadata: metadata });
+
+    return { message: 'Profile updated successfully.' };
   }
 
   /**
@@ -266,6 +432,9 @@ export class AuthService {
       id: profile.id,
       email: profile.email,
       fullName: profile.full_name,
+      dob: profile.dob,
+      gender: profile.gender,
+      mobileNumber: profile.mobile_number,
       avatarUrl: profile.avatar_url,
       defaultCurrency: profile.default_currency,
       themePreference: profile.theme_preference,

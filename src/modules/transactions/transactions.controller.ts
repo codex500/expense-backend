@@ -42,6 +42,12 @@ export class TransactionsController {
       sendPaginated(res, result.transactions, result.meta);
     } catch (err) { next(err); }
   }
+
+  async exportPdf(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      await transactionsService.exportPdf(req.user.id, res);
+    } catch (err) { next(err); }
+  }
 }
 
 export const transactionsController = new TransactionsController();

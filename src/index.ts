@@ -22,13 +22,22 @@ import salaryRoutes from './modules/salary/salary.module';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import advisorRoutes from './modules/advisor/advisor.module';
 import notificationRoutes from './modules/notifications/notifications.module';
+import contactRoutes from './modules/contact/contact.routes';
 
 const app = express();
 
 // Security Middlewares
 app.use(helmet());
 app.use(cors({
-  origin: env.CORS_ORIGIN,
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowed = env.CORS_ORIGIN.split(',').map(o => o.trim());
+    const isDev = env.NODE_ENV !== 'production';
+    if (allowed.includes(origin) || origin === env.APP_URL || (isDev && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')))) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
@@ -50,6 +59,7 @@ apiRouter.use('/salary', salaryRoutes);
 apiRouter.use('/analytics', analyticsRoutes);
 apiRouter.use('/advisor', advisorRoutes);
 apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/contact', contactRoutes);
 
 app.use('/api', apiRouter);
 

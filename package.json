@@ -31,7 +31,8 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^8.0.5",
+    "pdfkit": "^0.18.0",
     "pg": "^8.13.3",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
@@ -43,6 +44,7 @@
     "@types/node": "^22.15.3",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^6.4.17",
+    "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.11.11",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.4",
