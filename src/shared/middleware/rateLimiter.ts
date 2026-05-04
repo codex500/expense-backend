@@ -11,10 +11,8 @@ export const apiLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => {
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    console.log("Client IP:", ip);
-    return ip;
+  keyGenerator: (req) => {
+    return req.ip || 'unknown';
   },
   message: {
     success: false,
@@ -29,7 +27,7 @@ export const authLimiter = rateLimit({
   max: 100, // Increased for dev testing
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+  keyGenerator: (req: any) => req.ip || 'unknown',
   message: {
     success: false,
     message: 'Too many authentication attempts. Please try again later.',
@@ -43,7 +41,7 @@ export const emailLimiter = rateLimit({
   max: 50, // Increased for dev testing
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+  keyGenerator: (req: any) => req.ip || 'unknown',
   message: {
     success: false,
     message: 'Too many email requests. Please wait.',
