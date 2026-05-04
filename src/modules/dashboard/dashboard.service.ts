@@ -46,7 +46,23 @@ export class DashboardService {
     `;
 
     const { rows } = await query(sql, [userId]);
-    return rows[0];
+    const row = rows[0];
+
+    // PostgreSQL returns SUM(bigint) as strings — parse to numbers
+    return {
+      totalIncome: Number(row.totalIncome) || 0,
+      totalExpense: Number(row.totalExpense) || 0,
+      balance: Number(row.balance) || 0,
+      recentTransactions: (row.recentTransactions || []).map((t: any) => ({
+        ...t,
+        amount_paise: Number(t.amount_paise) || 0,
+      })),
+      weeklyData: (row.weeklyData || []).map((w: any) => ({
+        week: w.week,
+        income: Number(w.income) || 0,
+        expense: Number(w.expense) || 0,
+      })),
+    };
   }
 }
 
