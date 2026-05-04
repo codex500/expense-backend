@@ -89,6 +89,7 @@ export class AuthController {
   async getSession(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await authService.getSession(req.user.id);
+      console.log('[DEBUG] getSession API response:', result);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }

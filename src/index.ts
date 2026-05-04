@@ -9,6 +9,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { errorHandler } from './shared/middleware/errorHandler';
 import { apiLimiter } from './shared/middleware/rateLimiter';
+import compression from 'compression';
+import morgan from 'morgan';
+import timeout from 'connect-timeout';
 import pool from './config/database';
 import { setupCronJobs } from './jobs/cron';
 
@@ -23,11 +26,20 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import advisorRoutes from './modules/advisor/advisor.module';
 import notificationRoutes from './modules/notifications/notifications.module';
 import contactRoutes from './modules/contact/contact.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // Security Middlewares
 app.use(helmet());
+app.use(compression());
+app.use(morgan('dev')); // Request logging
+app.use(timeout('30s')); // Timeout handling
+app.use((req, res, next) => {
+  if (!req.timedout) next();
+});
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -59,6 +71,7 @@ apiRouter.use('/analytics', analyticsRoutes);
 apiRouter.use('/advisor', advisorRoutes);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/contact', contactRoutes);
+apiRouter.use('/dashboard', dashboardRoutes);
 
 app.use('/api', apiRouter);
 

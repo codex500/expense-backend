@@ -1,11 +1,15 @@
-/**
- * Email service — SMTP-based email system with throttling and templating.
- */
-
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Fix Render/Container networking by preferring IPv4 for DNS resolution
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 import { env } from '../../config/env';
 import { query } from '../../config/database';
 import { getBaseTemplate } from '../../templates/base';
+import { initEmailQueue, addToQueue } from './emailQueue';
 
 export class EmailService {
     private transporter: nodemailer.Transporter;
@@ -13,13 +17,29 @@ export class EmailService {
     constructor() {
         this.transporter = nodemailer.createTransport({
             host: env.SMTP_HOST,
-            port: env.SMTP_PORT,
-            secure: env.SMTP_PORT === 465,
+            port: 587, // Standard for STARTTLS (favored over 465 for Render/Cloud connectivity)
+            secure: false, // Avoid direct SSL/TLS; use STARTTLS instead
+            family: 4, // IMPORTANT → force IPv4
+            pool: true,
+            maxConnections: 5,
+            maxMessages: 100,
+            rateDelta: 1000,
+            rateLimit: 5,
             auth: {
                 user: env.SMTP_EMAIL,
                 pass: env.SMTP_PASSWORD,
             },
-        });
+            tls: {
+                rejectUnauthorized: false
+            }
+        } as any);
+
+        // Initialize the throttling queue
+        initEmailQueue(this.transporter);
+
+        this.transporter.verify()
+            .then(() => console.log('SMTP Ready'))
+            .catch(err => console.error('SMTP Error:', err.message));
     }
 
     /**
@@ -27,17 +47,32 @@ export class EmailService {
      */
     async canSendEmail(userId: string, emailType: string): Promise<boolean> {
         try {
-            // Check daily limit
+            // 1. Check overall daily limit per user
             const { rows: dailyRows } = await query(
                 `SELECT COUNT(*) as cnt FROM email_logs 
                  WHERE user_id = $1 AND sent_at >= CURRENT_DATE`,
                  [userId]
             );
             if (Number(dailyRows[0].cnt) >= env.MAX_EMAILS_PER_USER_PER_DAY) {
+                console.log(`[EmailService] 🚫 Daily limit reached for user ${userId}`);
                 return false;
             }
 
-            // Check cooldown for same type
+            // 2. Check if same type already sent today (Duplicate Email Prevention)
+            // Skip this check for 'otp' as users might need multiple attempts
+            if (emailType !== 'otp') {
+                const { rows: typeRows } = await query(
+                    `SELECT COUNT(*) as cnt FROM email_logs 
+                     WHERE user_id = $1 AND email_type = $2 AND sent_at >= CURRENT_DATE`,
+                     [userId, emailType]
+                );
+                if (Number(typeRows[0].cnt) > 0) {
+                    console.log(`[EmailService] ⏭️ Skipping duplicate ${emailType} email for user ${userId} today`);
+                    return false;
+                }
+            }
+
+            // 3. Check cooldown for same type
             const { rows: cooldownRows } = await query(
                 `SELECT sent_at FROM email_logs 
                  WHERE user_id = $1 AND email_type = $2
@@ -47,14 +82,14 @@ export class EmailService {
 
             if (cooldownRows.length > 0) {
                 const hoursSinceLast = (new Date().getTime() - new Date(cooldownRows[0].sent_at).getTime()) / (1000 * 60 * 60);
-                if (hoursSinceLast < env.EMAIL_COOLDOWN_HOURS) {
+                if (hoursSinceLast < env.EMAIL_COOLDOWN_HOURS && emailType !== 'otp') {
                     return false;
                 }
             }
 
             return true;
         } catch (error: any) {
-            console.warn('[EmailService] canSendEmail check failed (table may not exist):', error.message);
+            console.warn('[EmailService] canSendEmail check failed:', error.message);
             return true; // Allow sending if we can't check
         }
     }
@@ -70,35 +105,32 @@ export class EmailService {
         }
     }
 
-    async sendEmail(to: string, subject: string, html: string) {
+    async sendEmail(to: string, subject: string, html: string, userId?: string, emailType?: string) {
         if (!env.SMTP_HOST || !env.SMTP_PASSWORD || !env.MAIL_FROM) {
-            console.warn('[EmailService] SMTP not fully configured. Missing:', 
-                !env.SMTP_HOST ? 'SMTP_HOST' : '', 
-                !env.SMTP_PASSWORD ? 'SMTP_PASSWORD' : '',
-                !env.MAIL_FROM ? 'MAIL_FROM' : ''
-            );
+            console.warn('[EmailService] SMTP not fully configured.');
             return false;
         }
 
-        try {
-            await this.transporter.sendMail({
-                from: env.MAIL_FROM,
-                to,
-                subject,
-                html,
-            });
-            console.log(`[EmailService] ✅ Email sent to ${to}: ${subject}`);
-            return true;
-        } catch (error: any) {
-            console.error('[EmailService] ❌ Send error to', to, ':', error.message || error);
-            return false;
+        // If context is provided, enforce throttling and duplicate checks
+        if (userId && emailType) {
+            const canSend = await this.canSendEmail(userId, emailType);
+            if (!canSend) return false;
+            await this.logEmail(userId, emailType);
         }
+
+        // Add to the throttling queue
+        addToQueue({
+            from: env.MAIL_FROM,
+            to,
+            subject,
+            html,
+        });
+
+        console.log(`[EmailService] 📥 Email queued for ${to}: ${subject} ${emailType ? `(${emailType})` : ''}`);
+        return true;
     }
 
     async sendWelcomeEmail(userId: string, email: string, name: string) {
-        const canSend = await this.canSendEmail(userId, 'welcome');
-        if (!canSend) return false;
-
         const content = `
             <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Welcome to Trackify, ${name}!</h2>
             <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
@@ -106,16 +138,14 @@ export class EmailService {
             </p>
         `;
         const html = getBaseTemplate('Welcome to Trackify', content, `${env.APP_URL}`, 'Start Tracking');
-        
-        await this.sendEmail(email, 'Welcome to Trackify', html);
-        await this.logEmail(userId, 'welcome');
+
+        setImmediate(() => {
+            this.sendEmail(email, 'Welcome to Trackify', html, userId, 'welcome').catch(console.error);
+        });
         return true;
     }
 
     async sendDailyReminder(userId: string, email: string, name: string) {
-        const canSend = await this.canSendEmail(userId, 'daily_reminder');
-        if (!canSend) return false;
-
         const content = `
             <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Hi ${name},</h2>
             <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
@@ -123,16 +153,14 @@ export class EmailService {
             </p>
         `;
         const html = getBaseTemplate('Daily Tracking Reminder', content, `${env.APP_URL}`, 'Log Expenses');
-        
-        await this.sendEmail(email, "Don't forget to track today's expenses", html);
-        await this.logEmail(userId, 'daily_reminder');
+
+        setImmediate(() => {
+            this.sendEmail(email, "Don't forget to track today's expenses", html, userId, 'daily_reminder').catch(console.error);
+        });
         return true;
     }
     
     async sendBudgetWarning(userId: string, email: string, name: string, percentUsed: number) {
-        const canSend = await this.canSendEmail(userId, 'budget_warning');
-        if (!canSend) return false;
-
         const content = `
             <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">⚠️ Budget Alert, ${name}</h2>
             <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
@@ -140,9 +168,10 @@ export class EmailService {
             </p>
         `;
         const html = getBaseTemplate('Budget Warning', content, `${env.APP_URL}/budgets`, 'Review Budget');
-        
-        await this.sendEmail(email, `Warning: You are close to your budget limit (${percentUsed}%)`, html);
-        await this.logEmail(userId, 'budget_warning');
+
+        setImmediate(() => {
+            this.sendEmail(email, `Warning: You are close to your budget limit (${percentUsed}%)`, html, userId, 'budget_warning').catch(console.error);
+        });
         return true;
     }
 }

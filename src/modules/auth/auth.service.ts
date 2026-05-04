@@ -44,11 +44,16 @@ export class AuthService {
       encryptedPan = iv.toString('hex') + ':' + encrypted;
     }
 
+    let phone = input.mobileNumber;
+    if (phone && !phone.startsWith('+')) {
+       phone = '+91' + phone;
+    }
+
     await query(
-      `INSERT INTO user_profiles (id, email, full_name, dob, email_verified, gender, mobile_number, pan_card)
+      `INSERT INTO user_profiles (id, email, full_name, dob, email_verified, gender, phone_number, pan_number)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (id) DO NOTHING`,
-      [user.id, user.email, input.fullName, input.dob, false, input.gender, input.mobileNumber, encryptedPan]
+      [user.id, user.email, input.fullName, input.dob, false, input.gender, phone, encryptedPan]
     );
 
     // Send OTP verification email
@@ -174,8 +179,10 @@ export class AuthService {
         `;
         const html = getBaseTemplate('Reset Your Password', content, resetLink, 'Reset Password');
 
-        const sent = await emailService.sendEmail(email, 'Reset Your Trackify Password', html);
-        console.log(`[Auth] Password reset email ${sent ? 'sent' : 'FAILED'} to ${email}`);
+        setImmediate(() => {
+          emailService.sendEmail(email, 'Reset Your Trackify Password', html, data.user.id, 'password_reset').catch(console.error);
+        });
+        console.log(`[Auth] Password reset email queued to ${email}`);
       }
     } catch (err: any) {
       console.warn('[Auth] Password reset unexpected error:', err.message);
@@ -245,8 +252,10 @@ export class AuthService {
       <p style="margin: 0; color: #94a3b8; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
     `;
     const html = getBaseTemplate('Verify Email', content, '', '');
-    await emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html);
-    console.log(`[Auth] OTP sent to ${email}`);
+    setImmediate(() => {
+      emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html, userId, 'otp').catch(console.error);
+    });
+    console.log(`[Auth] OTP email queued to ${email}`);
 
     return { message: 'Verification code sent to your email.' };
   }
@@ -308,8 +317,12 @@ export class AuthService {
       params.push(updates.dob);
     }
     if (updates.mobileNumber !== undefined) {
-      setClauses.push(`mobile_number = $${idx++}`);
-      params.push(updates.mobileNumber);
+      let phone = updates.mobileNumber;
+      if (phone && !phone.startsWith('+')) {
+         phone = '+91' + phone;
+      }
+      setClauses.push(`phone_number = $${idx++}`);
+      params.push(phone);
     }
     if (updates.gender !== undefined) {
       setClauses.push(`gender = $${idx++}`);
@@ -432,11 +445,11 @@ export class AuthService {
     }
 
     const profile = rows[0];
-    let decryptedPan = 'Not provided';
-    if (profile.pan_card) {
+    let decryptedPan = null;
+    if (profile.pan_number) {
       try {
         const crypto = await import('crypto');
-        const [ivHex, encryptedHex] = profile.pan_card.split(':');
+        const [ivHex, encryptedHex] = profile.pan_number.split(':');
         const iv = Buffer.from(ivHex, 'hex');
         const key = crypto.createHash('sha256').update(env.JWT_SECRET).digest('base64').substring(0, 32);
         const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
@@ -455,8 +468,8 @@ export class AuthService {
       fullName: profile.full_name,
       dob: profile.dob,
       gender: profile.gender,
-      mobileNumber: profile.mobile_number,
-      panCard: decryptedPan,
+      phone: profile.phone_number,
+      pan: decryptedPan,
       avatarUrl: profile.avatar_url,
       defaultCurrency: profile.default_currency,
       themePreference: profile.theme_preference,
@@ -492,7 +505,9 @@ export class AuthService {
         <p style="margin: 0; color: #475569; font-size: 14px;">Best regards,<br>The Trackify Team</p>
       `;
       const html = getBaseTemplate('Account Deleted', content);
-      await emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html);
+      setImmediate(() => {
+        emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html, userId, 'account_deleted').catch(console.error);
+      });
     }
 
     // 3. Start a transaction to delete from DB

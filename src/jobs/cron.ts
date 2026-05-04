@@ -18,7 +18,7 @@ export function setupCronJobs() {
                 `SELECT id, email, full_name FROM user_profiles WHERE notify_email = true`
             );
             for (const user of users) {
-                await emailService.sendDailyReminder(user.id, user.email, user.full_name);
+                emailService.sendDailyReminder(user.id, user.email, user.full_name).catch(console.error);
                 await notificationsService.create(
                     user.id, 'general', 'Morning Reminder', "Don't forget to track your expenses today!"
                 );
@@ -42,7 +42,7 @@ export function setupCronJobs() {
             for (const user of users) {
                 const alerts = await budgetsService.checkBudgetAlerts(user.id);
                 for (const alert of alerts) {
-                     await emailService.sendBudgetWarning(user.id, user.email, user.full_name, alert.budget.percentUsed);
+                     emailService.sendBudgetWarning(user.id, user.email, user.full_name, alert.budget.percentUsed).catch(console.error);
                      await notificationsService.create(
                         user.id, 'budget_warning', 'Budget Alert', 
                         `You have used ${alert.budget.percentUsed}% of your ${alert.budget.scope} budget.`

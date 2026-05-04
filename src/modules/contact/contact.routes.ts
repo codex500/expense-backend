@@ -29,10 +29,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
        </div>`
     );
 
-    // Send to admin email (the actual inbox, not the noreply sender)
-    await emailService.sendEmail(env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml);
-
-    // 2. Send Acknowledgement to User
+    // 2. Build Acknowledgement to User
     const userHtml = getBaseTemplate(
       'Support Request Received',
       `<h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Hi ${name},</h2>
@@ -45,7 +42,11 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
        <p style="margin: 0; color: #475569; font-size: 14px;">Best regards,<br>The Trackify Team</p>`
     );
 
-    await emailService.sendEmail(email, 'We have received your support request - Trackify', userHtml);
+    // 3. Send both emails non-blocking — response returns immediately
+    setImmediate(() => {
+      emailService.sendEmail(env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml).catch(console.error);
+      emailService.sendEmail(email, 'We have received your support request - Trackify', userHtml).catch(console.error);
+    });
 
     res.status(200).json({ success: true, message: 'Message sent successfully.' });
   } catch (error) {

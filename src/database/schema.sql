@@ -19,11 +19,10 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   email             VARCHAR(255) NOT NULL UNIQUE,
   full_name         VARCHAR(255) NOT NULL DEFAULT '',
   avatar_url        TEXT,
-  phone             VARCHAR(20),
-  mobile_number     VARCHAR(20),
+  phone_number      VARCHAR(20),
   dob               DATE,
   gender            VARCHAR(20),
-  pan_card          TEXT,
+  pan_number        TEXT,
 
   -- Preferences
   default_currency  VARCHAR(10) NOT NULL DEFAULT 'INR',
@@ -150,6 +149,10 @@ CREATE INDEX IF NOT EXISTS idx_transactions_user_type ON transactions(user_id, t
 CREATE INDEX IF NOT EXISTS idx_transactions_user_category ON transactions(user_id, category);
 CREATE INDEX IF NOT EXISTS idx_transactions_account_id ON transactions(account_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
+
+-- Required new indexes
+CREATE INDEX IF NOT EXISTS idx_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_created_at ON transactions(created_at);
 
 -- ============================================================
 -- 5. BUDGETS (overall, category-wise, account-wise)

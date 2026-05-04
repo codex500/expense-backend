@@ -90,6 +90,16 @@ export function errorHandler(
     return;
   }
 
+  // Handle Timeout errors
+  if ((err as any).code === 'ETIMEDOUT' || err.message?.includes('Response timeout')) {
+    res.status(503).json({
+      success: false,
+      message: 'Request timeout.',
+      code: 'REQUEST_TIMEOUT',
+    });
+    return;
+  }
+
   // Unknown errors — never expose internals in production
   res.status(500).json({
     success: false,
