@@ -17,21 +17,21 @@ export class EmailService {
     constructor() {
         this.transporter = nodemailer.createTransport({
             host: env.SMTP_HOST,
-            port: 587, // Standard for STARTTLS (favored over 465 for Render/Cloud connectivity)
-            secure: false, // Avoid direct SSL/TLS; use STARTTLS instead
-            family: 4, // IMPORTANT → force IPv4
+            port: Number(env.SMTP_PORT) || 587,
+            secure: false,
+            family: 4, // FORCE IPv4 (IMPORTANT)
+            auth: {
+                user: env.SMTP_EMAIL,
+                pass: env.SMTP_PASSWORD,
+            },
             pool: true,
             maxConnections: 5,
             maxMessages: 100,
             rateDelta: 1000,
             rateLimit: 5,
-            auth: {
-                user: env.SMTP_EMAIL,
-                pass: env.SMTP_PASSWORD,
-            },
             tls: {
-                rejectUnauthorized: false
-            }
+                rejectUnauthorized: false,
+            },
         } as any);
 
         // Initialize the throttling queue

@@ -66,5 +66,15 @@ export function setupCronJobs() {
          // Logic for salary reminder
     }, { timezone: "Asia/Kolkata" });
 
+    // 6. Keep-alive (Every 5 minutes)
+    cron.schedule('*/5 * * * *', async () => {
+        try {
+            const res = await fetch(`${env.APP_URL}/health`);
+            if (res.ok) console.log('[Cron] Keep-alive ping successful');
+        } catch (error: any) {
+            console.warn('[Cron] Keep-alive ping failed:', error.message);
+        }
+    });
+
     console.log('[Cron] All jobs scheduled successfully.');
 }

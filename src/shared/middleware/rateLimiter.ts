@@ -7,13 +7,14 @@ import { env } from '../../config/env';
 
 /** Default API rate limiter — 100 requests per 15 minutes */
 export const apiLimiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    console.log("Client IP:", req.ip);
-    return req.ip || req.socket.remoteAddress || 'unknown';
+  keyGenerator: (req: any) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    console.log("Client IP:", ip);
+    return ip;
   },
   message: {
     success: false,
@@ -28,9 +29,7 @@ export const authLimiter = rateLimit({
   max: 100, // Increased for dev testing
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || req.socket.remoteAddress || 'unknown';
-  },
+  keyGenerator: (req: any) => req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
   message: {
     success: false,
     message: 'Too many authentication attempts. Please try again later.',
@@ -44,9 +43,7 @@ export const emailLimiter = rateLimit({
   max: 50, // Increased for dev testing
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || req.socket.remoteAddress || 'unknown';
-  },
+  keyGenerator: (req: any) => req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress,
   message: {
     success: false,
     message: 'Too many email requests. Please wait.',
