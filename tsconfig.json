@@ -14,14 +14,6 @@
     "declarationMap": true,
     "sourceMap": true,
     "moduleResolution": "node",
-    "baseUrl": "./src",
-    "paths": {
-      "@config/*": ["config/*"],
-      "@modules/*": ["modules/*"],
-      "@shared/*": ["shared/*"],
-      "@jobs/*": ["jobs/*"],
-      "@templates/*": ["templates/*"]
-    },
     "typeRoots": ["./node_modules/@types", "./src/shared/types"],
     "noUnusedLocals": false,
     "noUnusedParameters": false,
