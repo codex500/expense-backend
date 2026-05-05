@@ -159,7 +159,7 @@ export class AuthService {
         console.warn('[Auth] Password reset error:', error.message);
       } else if (data?.properties?.action_link) {
         // Send the reset email ourselves via our SMTP
-        const { emailService } = await import('../emails/emails.service');
+        const { emailService } = await import('../../services/emailService');
         const { getBaseTemplate } = await import('../../templates/base');
 
         // Use the original Supabase action_link — it must go through Supabase's
@@ -180,7 +180,7 @@ export class AuthService {
         const html = getBaseTemplate('Reset Your Password', content, resetLink, 'Reset Password');
 
         setImmediate(() => {
-          emailService.sendEmail(email, 'Reset Your Trackify Password', html, data.user.id, 'password_reset').catch(console.error);
+          emailService.sendEmail(email, 'Reset Your Trackify Password', html).catch(console.error);
         });
         console.log(`[Auth] Password reset email queued to ${email}`);
       }
@@ -236,7 +236,7 @@ export class AuthService {
     );
 
     // Send OTP email
-    const { emailService } = await import('../emails/emails.service');
+    const { emailService } = await import('../../services/emailService');
     const { getBaseTemplate } = await import('../../templates/base');
 
     const content = `
@@ -253,7 +253,7 @@ export class AuthService {
     `;
     const html = getBaseTemplate('Verify Email', content, '', '');
     setImmediate(() => {
-      emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html, userId, 'otp').catch(console.error);
+      emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html).catch(console.error);
     });
     console.log(`[Auth] OTP email queued to ${email}`);
 
@@ -489,7 +489,7 @@ export class AuthService {
 
     // 2. Send goodbye email first (before DB connections or auth invalidation)
     if (userEmail) {
-      const { emailService } = await import('../emails/emails.service');
+      const { emailService } = await import('../../services/emailService');
       const { getBaseTemplate } = await import('../../templates/base');
       
       const content = `
@@ -506,7 +506,7 @@ export class AuthService {
       `;
       const html = getBaseTemplate('Account Deleted', content);
       setImmediate(() => {
-        emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html, userId, 'account_deleted').catch(console.error);
+        emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html).catch(console.error);
       });
     }
 

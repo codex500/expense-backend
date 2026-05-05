@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { emailService } from '../emails/emails.service';
+import { emailService } from '../../services/emailService';
 import { getBaseTemplate } from '../../templates/base';
 import { env } from '../../config/env';
 
@@ -44,7 +44,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // 3. Send both emails non-blocking — response returns immediately
     setImmediate(() => {
-      emailService.sendEmail(env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml).catch(console.error);
+      emailService.sendEmail('support@trackifyapp.space', `Support Request: ${subject}`, adminHtml).catch(console.error);
       emailService.sendEmail(email, 'We have received your support request - Trackify', userHtml).catch(console.error);
     });
 

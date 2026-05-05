@@ -4,7 +4,8 @@
 
 import cron from 'node-cron';
 import { query } from '../config/database';
-import { emailService } from '../modules/emails/emails.service';
+import { env } from '../config/env';
+import { emailService } from '../services/emailService';
 import { notificationsService } from '../modules/notifications/notifications.module';
 import { budgetsService } from '../modules/budgets/budgets.service';
 
@@ -18,7 +19,7 @@ export function setupCronJobs() {
                 `SELECT id, email, full_name FROM user_profiles WHERE notify_email = true`
             );
             for (const user of users) {
-                emailService.sendDailyReminder(user.id, user.email, user.full_name).catch(console.error);
+                emailService.sendDailyReminder(user.email, user.full_name).catch(console.error);
                 await notificationsService.create(
                     user.id, 'general', 'Morning Reminder', "Don't forget to track your expenses today!"
                 );
@@ -42,7 +43,7 @@ export function setupCronJobs() {
             for (const user of users) {
                 const alerts = await budgetsService.checkBudgetAlerts(user.id);
                 for (const alert of alerts) {
-                     emailService.sendBudgetWarning(user.id, user.email, user.full_name, alert.budget.percentUsed).catch(console.error);
+                     emailService.sendBudgetWarning(user.email, user.full_name, alert.budget.percentUsed).catch(console.error);
                      await notificationsService.create(
                         user.id, 'budget_warning', 'Budget Alert', 
                         `You have used ${alert.budget.percentUsed}% of your ${alert.budget.scope} budget.`
