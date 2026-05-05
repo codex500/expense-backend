@@ -100,10 +100,7 @@ export function errorHandler(
     return;
   }
 
-  // Unknown errors — never expose internals in production
-  res.status(500).json({
-    success: false,
-    message: env.IS_PRODUCTION ? 'An unexpected error occurred.' : err.message,
-    code: 'INTERNAL_ERROR',
-  });
+  // Unknown errors
+  console.error(err);
+  res.status(500).json({ message: "Server error" });
 }
