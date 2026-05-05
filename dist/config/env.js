@@ -44,19 +44,12 @@ exports.env = {
     JWT_SECRET: required('JWT_SECRET'),
     JWT_EXPIRY: optional('JWT_EXPIRY', '7d'),
     JWT_REFRESH_EXPIRY: optional('JWT_REFRESH_EXPIRY', '30d'),
-    // SMTP
-    SMTP_HOST: optional('SMTP_HOST', ''),
-    SMTP_PORT: optionalInt('SMTP_PORT', 587),
-    SMTP_EMAIL: optional('SMTP_EMAIL', ''),
-    SMTP_PASSWORD: optional('SMTP_PASSWORD', ''),
-    MAIL_FROM: optional('MAIL_FROM', ''),
     // CORS
     CORS_ORIGIN: optional('CORS_ORIGIN', ''),
     // Rate Limiting
     RATE_LIMIT_WINDOW_MS: optionalInt('RATE_LIMIT_WINDOW_MS', 900_000),
     RATE_LIMIT_MAX: optionalInt('RATE_LIMIT_MAX', 100),
-    // Email Throttle
-    MAX_EMAILS_PER_USER_PER_DAY: optionalInt('MAX_EMAILS_PER_USER_PER_DAY', 6),
-    EMAIL_COOLDOWN_HOURS: optionalInt('EMAIL_COOLDOWN_HOURS', 4),
+    // Resend API Key
+    RESEND_API_KEY: optional('RESEND_API_KEY', ''),
 };
 //# sourceMappingURL=env.js.map

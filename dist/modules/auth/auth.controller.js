@@ -107,6 +107,7 @@ class AuthController {
     async getSession(req, res, next) {
         try {
             const result = await auth_service_1.authService.getSession(req.user.id);
+            console.log('[DEBUG] getSession API response:', result);
             (0, response_1.sendSuccess)(res, result);
         }
         catch (err) {

@@ -185,7 +185,6 @@ export class AuthService {
         setImmediate(() => {
           emailService.sendEmail(email, 'Reset Your Trackify Password', html).catch(console.error);
         });
-        console.log(`[Auth] Password reset email queued to ${email}`);
       }
     } catch (err: any) {
       console.warn('[Auth] Password reset unexpected error:', err.message);
@@ -269,11 +268,10 @@ export class AuthService {
     `;
     const html = getBaseTemplate('Verify Email', content, '', '');
     setImmediate(() => {
-      emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html).catch(console.error);
+      emailService.sendEmail(email, 'Your Trackify Verification Code', html).catch(console.error);
     });
-    console.log(`[Auth] OTP email queued to ${email}`);
 
-    return { message: 'Verification code sent to your email.' };
+    return { message: 'OTP sent to email. Please verify to login.', isNewUser: false };
   }
 
   /**

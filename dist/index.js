@@ -8,11 +8,25 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const env_1 = require("./config/env");
+// Handle Uncaught Errors
+process.on('uncaughtException', (err) => {
+    console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+    console.error(err.name, err.message);
+    process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+    console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+    console.error(err.name, err.message);
+    process.exit(1);
+});
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const errorHandler_1 = require("./shared/middleware/errorHandler");
 const rateLimiter_1 = require("./shared/middleware/rateLimiter");
+const compression_1 = __importDefault(require("compression"));
+const morgan_1 = __importDefault(require("morgan"));
+const connect_timeout_1 = __importDefault(require("connect-timeout"));
 const database_1 = __importDefault(require("./config/database"));
 const cron_1 = require("./jobs/cron");
 // Routes
@@ -26,9 +40,18 @@ const analytics_routes_1 = __importDefault(require("./modules/analytics/analytic
 const advisor_module_1 = __importDefault(require("./modules/advisor/advisor.module"));
 const notifications_module_1 = __importDefault(require("./modules/notifications/notifications.module"));
 const contact_routes_1 = __importDefault(require("./modules/contact/contact.routes"));
+const dashboard_routes_1 = __importDefault(require("./modules/dashboard/dashboard.routes"));
 const app = (0, express_1.default)();
+app.set('trust proxy', 1);
 // Security Middlewares
 app.use((0, helmet_1.default)());
+app.use((0, compression_1.default)());
+app.use((0, morgan_1.default)('dev')); // Request logging
+app.use((0, connect_timeout_1.default)('30s')); // Timeout handling
+app.use((req, res, next) => {
+    if (!req.timedout)
+        next();
+});
 app.use((0, cors_1.default)({
     origin: function (origin, callback) {
         if (!origin)
@@ -44,6 +67,10 @@ app.use((0, cors_1.default)({
 }));
 app.use(express_1.default.json({ limit: '1mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
+// Debug Log for Client IP
+app.use((req, res, next) => {
+    next();
+});
 // Global Rate Limiter
 app.use('/api/', rateLimiter_1.apiLimiter);
 // API Routes
@@ -58,16 +85,11 @@ apiRouter.use('/analytics', analytics_routes_1.default);
 apiRouter.use('/advisor', advisor_module_1.default);
 apiRouter.use('/notifications', notifications_module_1.default);
 apiRouter.use('/contact', contact_routes_1.default);
+apiRouter.use('/dashboard', dashboard_routes_1.default);
 app.use('/api', apiRouter);
 // Health Check
-app.get('/health', async (req, res) => {
-    try {
-        await database_1.default.query('SELECT 1');
-        res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
-    }
-    catch (error) {
-        res.status(503).json({ status: 'error', database: 'disconnected' });
-    }
+app.get('/health', (req, res) => {
+    res.send("OK");
 });
 // Root
 app.get('/', (req, res) => {
@@ -85,10 +107,10 @@ app.use((req, res) => {
 app.use(errorHandler_1.errorHandler);
 // Start Server
 app.listen(env_1.env.PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on port ${env_1.env.PORT} in ${env_1.env.NODE_ENV} mode`);
+    console.info(`🚀 Server running on port ${env_1.env.PORT} in ${env_1.env.NODE_ENV} mode`);
     // Warm up database connection
     database_1.default.query('SELECT 1')
-        .then(() => console.log('✅ Database connected to Supabase Pooler'))
+        .then(() => console.info('✅ Database connected to Supabase Pooler'))
         .catch((err) => console.warn('⚠️ Database connection warning:', err.message));
     // Start Cron Jobs
     (0, cron_1.setupCronJobs)();

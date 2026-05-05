@@ -71,9 +71,13 @@ class AuthService {
             encrypted += cipher.final('hex');
             encryptedPan = iv.toString('hex') + ':' + encrypted;
         }
-        await (0, database_1.query)(`INSERT INTO user_profiles (id, email, full_name, dob, email_verified, gender, mobile_number, pan_card)
+        let phone = input.mobileNumber;
+        if (phone && !phone.startsWith('+')) {
+            phone = '+91' + phone;
+        }
+        await (0, database_1.query)(`INSERT INTO user_profiles (id, email, full_name, dob, email_verified, gender, phone_number, pan_number)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (id) DO NOTHING`, [user.id, user.email, input.fullName, input.dob, false, input.gender, input.mobileNumber, encryptedPan]);
+       ON CONFLICT (id) DO NOTHING`, [user.id, user.email, input.fullName, input.dob, false, input.gender, phone, encryptedPan]);
         // Send OTP verification email
         try {
             await this.sendOtp(user.id, input.email);
@@ -143,41 +147,39 @@ class AuthService {
         return { message: 'Logged out successfully.' };
     }
     /**
-     * Trigger forgot password email through Supabase.
+     * Trigger forgot password email.
      */
     async forgotPassword(email, redirectUrl) {
         try {
-            // redirect_to points to frontend root — AppWrapper intercepts the hash and routes to /reset-password
-            const frontendUrl = redirectUrl || env_1.env.APP_URL;
-            const { data, error } = await supabase_1.supabaseAdmin.auth.admin.generateLink({
-                type: 'recovery',
-                email,
-                options: { redirectTo: frontendUrl },
-            });
-            if (error) {
-                console.warn('[Auth] Password reset error:', error.message);
-            }
-            else if (data?.properties?.action_link) {
-                // Send the reset email ourselves via our SMTP
-                const { emailService } = await Promise.resolve().then(() => __importStar(require('../emails/emails.service')));
+            const { rows } = await (0, database_1.query)('SELECT id FROM user_profiles WHERE email = $1', [email]);
+            if (rows.length > 0) {
+                const userId = rows[0].id;
+                // Generate secure token
+                const crypto = await Promise.resolve().then(() => __importStar(require('crypto')));
+                const token = crypto.randomBytes(32).toString('hex');
+                const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+                // Store hashed token in DB, expire after 15 min
+                await (0, database_1.query)(`INSERT INTO password_reset_tokens (user_id, hashed_token, expires_at) 
+           VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`, [userId, hashedToken]);
+                const frontendUrl = redirectUrl || env_1.env.APP_URL;
+                const baseUrl = frontendUrl.endsWith('/') ? frontendUrl.slice(0, -1) : frontendUrl;
+                const resetLink = `${baseUrl}/#type=recovery&access_token=${token}`;
+                const { emailService } = await Promise.resolve().then(() => __importStar(require('../../services/emailService')));
                 const { getBaseTemplate } = await Promise.resolve().then(() => __importStar(require('../../templates/base')));
-                // Use the original Supabase action_link — it must go through Supabase's
-                // /auth/v1/verify endpoint first so the hashed token gets exchanged for
-                // a real JWT access_token before redirecting to our frontend.
-                const resetLink = data.properties.action_link;
                 const content = `
           <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Reset Your Password</h2>
           <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
             We received a request to reset your password. Click the button below to choose a new password.
-            This link will expire in 1 hour.
+            This link will expire in 15 minutes.
           </p>
           <p style="margin: 0 0 10px; color: #94a3b8; font-size: 13px;">
             If you didn't request this, you can safely ignore this email.
           </p>
         `;
                 const html = getBaseTemplate('Reset Your Password', content, resetLink, 'Reset Password');
-                const sent = await emailService.sendEmail(email, 'Reset Your Trackify Password', html);
-                console.log(`[Auth] Password reset email ${sent ? 'sent' : 'FAILED'} to ${email}`);
+                setImmediate(() => {
+                    emailService.sendEmail(email, 'Reset Your Trackify Password', html).catch(console.error);
+                });
             }
         }
         catch (err) {
@@ -187,19 +189,25 @@ class AuthService {
         return { message: 'If an account with that email exists, a password reset link has been sent.' };
     }
     /**
-     * Reset password (after user clicks email link, Supabase provides a session).
+     * Reset password via custom token.
      */
     async resetPassword(accessToken, newPassword) {
-        // 1. Verify the token and get the user
-        const { data: { user }, error: userError } = await supabase_1.supabaseAdmin.auth.getUser(accessToken);
-        if (userError || !user?.id) {
+        const crypto = await Promise.resolve().then(() => __importStar(require('crypto')));
+        const hashedToken = crypto.createHash('sha256').update(accessToken).digest('hex');
+        // 1. Verify token
+        const { rows } = await (0, database_1.query)(`SELECT user_id FROM password_reset_tokens 
+       WHERE hashed_token = $1 AND expires_at > NOW()`, [hashedToken]);
+        if (rows.length === 0) {
             throw new errors_1.UnauthorizedError('Invalid or expired password reset token.');
         }
-        // 2. Use the user ID to update the password
-        const { error } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+        const userId = rows[0].user_id;
+        // 2. Use the user ID to update the password securely
+        const { error } = await supabase_1.supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
         if (error) {
             throw new errors_1.BadRequestError('Failed to reset password. Link may have expired.');
         }
+        // 3. Clean up the used token
+        await (0, database_1.query)(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [userId]);
         return { message: 'Password reset successfully.' };
     }
     /**
@@ -217,7 +225,7 @@ class AuthService {
         // Store the OTP (expires in 10 minutes)
         await (0, database_1.query)(`INSERT INTO email_otps (user_id, email, otp_code, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '10 minutes')`, [userId, email, otp]);
         // Send OTP email
-        const { emailService } = await Promise.resolve().then(() => __importStar(require('../emails/emails.service')));
+        const { emailService } = await Promise.resolve().then(() => __importStar(require('../../services/emailService')));
         const { getBaseTemplate } = await Promise.resolve().then(() => __importStar(require('../../templates/base')));
         const content = `
       <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Verify Your Email</h2>
@@ -232,9 +240,10 @@ class AuthService {
       <p style="margin: 0; color: #94a3b8; font-size: 13px;">This code expires in 10 minutes. Do not share it with anyone.</p>
     `;
         const html = getBaseTemplate('Verify Email', content, '', '');
-        await emailService.sendEmail(email, `Your Trackify Verification Code: ${otp}`, html);
-        console.log(`[Auth] OTP sent to ${email}`);
-        return { message: 'Verification code sent to your email.' };
+        setImmediate(() => {
+            emailService.sendEmail(email, 'Your Trackify Verification Code', html).catch(console.error);
+        });
+        return { message: 'OTP sent to email. Please verify to login.', isNewUser: false };
     }
     /**
      * Verify email via OTP code.
@@ -281,8 +290,16 @@ class AuthService {
             params.push(updates.dob);
         }
         if (updates.mobileNumber !== undefined) {
-            setClauses.push(`mobile_number = $${idx++}`);
-            params.push(updates.mobileNumber);
+            let phone = updates.mobileNumber;
+            if (phone && !phone.startsWith('+')) {
+                phone = '+91' + phone;
+            }
+            setClauses.push(`phone_number = $${idx++}`);
+            params.push(phone);
+        }
+        if (updates.gender !== undefined) {
+            setClauses.push(`gender = $${idx++}`);
+            params.push(updates.gender);
         }
         if (setClauses.length === 0) {
             throw new errors_1.BadRequestError('No valid fields to update.');
@@ -369,13 +386,31 @@ class AuthService {
             throw new errors_1.NotFoundError('User profile not found.');
         }
         const profile = rows[0];
+        let decryptedPan = null;
+        if (profile.pan_number) {
+            try {
+                const crypto = await Promise.resolve().then(() => __importStar(require('crypto')));
+                const [ivHex, encryptedHex] = profile.pan_number.split(':');
+                const iv = Buffer.from(ivHex, 'hex');
+                const key = crypto.createHash('sha256').update(env_1.env.JWT_SECRET).digest('base64').substring(0, 32);
+                const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
+                let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+                decrypted += decipher.final('utf8');
+                decryptedPan = decrypted;
+            }
+            catch (err) {
+                console.warn('[Auth] Error decrypting PAN:', err);
+                decryptedPan = 'Error decrypting';
+            }
+        }
         return {
             id: profile.id,
             email: profile.email,
             fullName: profile.full_name,
             dob: profile.dob,
             gender: profile.gender,
-            mobileNumber: profile.mobile_number,
+            phone: profile.phone_number ?? "Not Provided",
+            pan: decryptedPan ?? "Not Provided",
             avatarUrl: profile.avatar_url,
             defaultCurrency: profile.default_currency,
             themePreference: profile.theme_preference,
@@ -388,18 +423,40 @@ class AuthService {
      * Delete the entire user account and all associated data.
      */
     async deleteAccount(userId) {
-        // Start a transaction just to log it to audit, then delete from DB
+        // 1. Get user details before deletion so we can email them
+        const { rows } = await (0, database_1.query)(`SELECT email, full_name FROM user_profiles WHERE id = $1`, [userId]);
+        const userEmail = rows[0]?.email;
+        const userName = rows[0]?.full_name || 'User';
+        // 2. Send goodbye email first (before DB connections or auth invalidation)
+        if (userEmail) {
+            const { emailService } = await Promise.resolve().then(() => __importStar(require('../../services/emailService')));
+            const { getBaseTemplate } = await Promise.resolve().then(() => __importStar(require('../../templates/base')));
+            const content = `
+        <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Account Deleted Successfully</h2>
+        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">
+          Hi ${userName},<br><br>
+          We're writing to confirm that your Trackify account has been permanently deleted, per your request.
+        </p>
+        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">
+          All of your personal data, accounts, transactions, and budgets have been completely wiped from our servers. 
+          We're sorry to see you go! If you ever decide to return, you'll need to create a new account.
+        </p>
+        <p style="margin: 0; color: #475569; font-size: 14px;">Best regards,<br>The Trackify Team</p>
+      `;
+            const html = getBaseTemplate('Account Deleted', content);
+            setImmediate(() => {
+                emailService.sendEmail(userEmail, 'Your Trackify account has been deleted', html).catch(console.error);
+            });
+        }
+        // 3. Start a transaction to delete from DB
         await (0, database_1.withTransaction)(async (client) => {
-            // Create an audit log simply right before delete for history, or just delete directly.
-            // We'll delete directly from user_profiles. Due to ON DELETE CASCADE on all tables,
-            // this will wipe accounts, transactions, budgets, salary_entries, etc.
+            // Due to ON DELETE CASCADE on all tables, this will wipe everything.
             await client.query(`DELETE FROM user_profiles WHERE id = $1`, [userId]);
         });
-        // Delete user from Supabase Auth
+        // 4. Delete user from Supabase Auth
         const { error } = await supabase_1.supabaseAdmin.auth.admin.deleteUser(userId);
         if (error) {
             console.warn('[Auth] Failed to delete user from Supabase Auth:', error.message);
-            // We still return true because DB data is deleted.
         }
         return { message: 'Account and all associated data successfully deleted.' };
     }

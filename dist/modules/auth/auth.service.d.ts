@@ -40,13 +40,13 @@ export declare class AuthService {
         message: string;
     }>;
     /**
-     * Trigger forgot password email through Supabase.
+     * Trigger forgot password email.
      */
     forgotPassword(email: string, redirectUrl: string): Promise<{
         message: string;
     }>;
     /**
-     * Reset password (after user clicks email link, Supabase provides a session).
+     * Reset password via custom token.
      */
     resetPassword(accessToken: string, newPassword: string): Promise<{
         message: string;
@@ -56,6 +56,7 @@ export declare class AuthService {
      */
     sendOtp(userId: string, email: string): Promise<{
         message: string;
+        isNewUser: boolean;
     }>;
     /**
      * Verify email via OTP code.
@@ -76,6 +77,7 @@ export declare class AuthService {
         fullName?: string;
         dob?: string;
         mobileNumber?: string;
+        gender?: string;
     }): Promise<{
         message: string;
     }>;
@@ -107,7 +109,8 @@ export declare class AuthService {
         fullName: any;
         dob: any;
         gender: any;
-        mobileNumber: any;
+        phone: any;
+        pan: string;
         avatarUrl: any;
         defaultCurrency: any;
         themePreference: any;

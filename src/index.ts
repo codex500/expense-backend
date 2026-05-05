@@ -4,6 +4,20 @@
  */
 
 import { env } from './config/env';
+
+// Handle Uncaught Errors
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (err: any) => {
+  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
+});
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -57,7 +71,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Debug Log for Client IP
 app.use((req, res, next) => {
-  console.log("Client IP:", req.ip);
   next();
 });
 
@@ -105,11 +118,11 @@ app.use(errorHandler);
 
 // Start Server
 app.listen(env.PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
+  console.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
   
   // Warm up database connection
   pool.query('SELECT 1')
-    .then(() => console.log('✅ Database connected to Supabase Pooler'))
+    .then(() => console.info('✅ Database connected to Supabase Pooler'))
     .catch((err) => console.warn('⚠️ Database connection warning:', err.message));
     
   // Start Cron Jobs

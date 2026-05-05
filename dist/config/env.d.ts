@@ -14,15 +14,9 @@ export declare const env: {
     readonly JWT_SECRET: string;
     readonly JWT_EXPIRY: string;
     readonly JWT_REFRESH_EXPIRY: string;
-    readonly SMTP_HOST: string;
-    readonly SMTP_PORT: number;
-    readonly SMTP_EMAIL: string;
-    readonly SMTP_PASSWORD: string;
-    readonly MAIL_FROM: string;
     readonly CORS_ORIGIN: string;
     readonly RATE_LIMIT_WINDOW_MS: number;
     readonly RATE_LIMIT_MAX: number;
-    readonly MAX_EMAILS_PER_USER_PER_DAY: number;
-    readonly EMAIL_COOLDOWN_HOURS: number;
+    readonly RESEND_API_KEY: string;
 };
 //# sourceMappingURL=env.d.ts.map

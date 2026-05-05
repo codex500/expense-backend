@@ -21,9 +21,9 @@ export declare const createTransactionSchema: z.ZodObject<{
     amountPaise: number;
     transactionDate: string;
     isRecurring: boolean;
+    tags?: string[] | undefined;
     note?: string | undefined;
     paymentMethod?: string | undefined;
-    tags?: string[] | undefined;
     receiptUrl?: string | null | undefined;
     recurringInterval?: "daily" | "weekly" | "monthly" | "yearly" | undefined;
 }, {
@@ -32,9 +32,9 @@ export declare const createTransactionSchema: z.ZodObject<{
     accountId: string;
     amountPaise: number;
     transactionDate: string;
+    tags?: string[] | undefined;
     note?: string | undefined;
     paymentMethod?: string | undefined;
-    tags?: string[] | undefined;
     receiptUrl?: string | null | undefined;
     isRecurring?: boolean | undefined;
     recurringInterval?: "daily" | "weekly" | "monthly" | "yearly" | undefined;
@@ -52,6 +52,7 @@ export declare const updateTransactionSchema: z.ZodObject<{
     isRecurring: z.ZodOptional<z.ZodBoolean>;
     recurringInterval: z.ZodNullable<z.ZodOptional<z.ZodEnum<["daily", "weekly", "monthly", "yearly"]>>>;
 }, "strip", z.ZodTypeAny, {
+    tags?: string[] | undefined;
     category?: string | undefined;
     type?: "income" | "expense" | undefined;
     accountId?: string | undefined;
@@ -59,11 +60,11 @@ export declare const updateTransactionSchema: z.ZodObject<{
     note?: string | null | undefined;
     transactionDate?: string | undefined;
     paymentMethod?: string | null | undefined;
-    tags?: string[] | undefined;
     receiptUrl?: string | null | undefined;
     isRecurring?: boolean | undefined;
     recurringInterval?: "daily" | "weekly" | "monthly" | "yearly" | null | undefined;
 }, {
+    tags?: string[] | undefined;
     category?: string | undefined;
     type?: "income" | "expense" | undefined;
     accountId?: string | undefined;
@@ -71,7 +72,6 @@ export declare const updateTransactionSchema: z.ZodObject<{
     note?: string | null | undefined;
     transactionDate?: string | undefined;
     paymentMethod?: string | null | undefined;
-    tags?: string[] | undefined;
     receiptUrl?: string | null | undefined;
     isRecurring?: boolean | undefined;
     recurringInterval?: "daily" | "weekly" | "monthly" | "yearly" | null | undefined;

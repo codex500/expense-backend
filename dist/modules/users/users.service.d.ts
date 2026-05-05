@@ -9,6 +9,7 @@ export declare class UsersService {
         fullName: any;
         avatarUrl: any;
         phone: any;
+        pan: any;
         defaultCurrency: any;
         themePreference: any;
         notifyEmail: any;
@@ -32,6 +33,7 @@ export declare class UsersService {
         fullName: any;
         avatarUrl: any;
         phone: any;
+        pan: any;
         defaultCurrency: any;
         themePreference: any;
         notifyEmail: any;

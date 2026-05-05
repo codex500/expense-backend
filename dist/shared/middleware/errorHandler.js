@@ -78,11 +78,17 @@ function errorHandler(err, _req, res, _next) {
         });
         return;
     }
-    // Unknown errors — never expose internals in production
-    res.status(500).json({
-        success: false,
-        message: env_1.env.IS_PRODUCTION ? 'An unexpected error occurred.' : err.message,
-        code: 'INTERNAL_ERROR',
-    });
+    // Handle Timeout errors
+    if (err.code === 'ETIMEDOUT' || err.message?.includes('Response timeout')) {
+        res.status(503).json({
+            success: false,
+            message: 'Request timeout.',
+            code: 'REQUEST_TIMEOUT',
+        });
+        return;
+    }
+    // Unknown errors
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
 }
 //# sourceMappingURL=errorHandler.js.map

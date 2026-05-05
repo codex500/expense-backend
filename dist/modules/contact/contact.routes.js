@@ -2,9 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const zod_1 = require("zod");
-const emails_service_1 = require("../emails/emails.service");
+const emailService_1 = require("../../services/emailService");
 const base_1 = require("../../templates/base");
-const env_1 = require("../../config/env");
 const router = (0, express_1.Router)();
 const contactSchema = zod_1.z.object({
     name: zod_1.z.string().min(1, "Name is required"),
@@ -23,9 +22,7 @@ router.post('/', async (req, res, next) => {
        <div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin-top: 15px;">
          <p style="margin: 0; color: #334155; white-space: pre-wrap;">${message}</p>
        </div>`);
-        // Send to admin email (the actual inbox, not the noreply sender)
-        await emails_service_1.emailService.sendEmail(env_1.env.SMTP_EMAIL, `Support Request: ${subject}`, adminHtml);
-        // 2. Send Acknowledgement to User
+        // 2. Build Acknowledgement to User
         const userHtml = (0, base_1.getBaseTemplate)('Support Request Received', `<h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Hi ${name},</h2>
        <p style="margin: 0 0 16px; color: #475569; line-height: 1.6;">
          Thanks for reaching out to us! We have received your message regarding "<strong>${subject}</strong>".
@@ -34,7 +31,11 @@ router.post('/', async (req, res, next) => {
          Our support team will review your inquiry and get back to you as soon as possible.
        </p>
        <p style="margin: 0; color: #475569; font-size: 14px;">Best regards,<br>The Trackify Team</p>`);
-        await emails_service_1.emailService.sendEmail(email, 'We have received your support request - Trackify', userHtml);
+        // 3. Send both emails non-blocking — response returns immediately
+        setImmediate(() => {
+            emailService_1.emailService.sendEmail('support@trackifyapp.space', `Support Request: ${subject}`, adminHtml).catch(console.error);
+            emailService_1.emailService.sendEmail(email, 'We have received your support request - Trackify', userHtml).catch(console.error);
+        });
         res.status(200).json({ success: true, message: 'Message sent successfully.' });
     }
     catch (error) {
