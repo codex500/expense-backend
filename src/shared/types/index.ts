@@ -14,7 +14,11 @@ export interface AuthUser {
 
 /** Extended Express Request with authenticated user */
 export interface AuthenticatedRequest extends Request {
-  user: AuthUser;
+  user?: any;
+  body: any;
+  params: any;
+  query: any;
+  headers: any;
 }
 
 /** Standard API response envelope */
