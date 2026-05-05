@@ -143,35 +143,38 @@ export class AuthService {
   }
 
   /**
-   * Trigger forgot password email through Supabase.
+   * Trigger forgot password email.
    */
   async forgotPassword(email: string, redirectUrl: string) {
     try {
-      // redirect_to points to frontend root — AppWrapper intercepts the hash and routes to /reset-password
-      const frontendUrl = redirectUrl || env.APP_URL;
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-        options: { redirectTo: frontendUrl },
-      });
+      const { rows } = await query('SELECT id FROM user_profiles WHERE email = $1', [email]);
+      if (rows.length > 0) {
+        const userId = rows[0].id;
+        
+        // Generate secure token
+        const crypto = await import('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-      if (error) {
-        console.warn('[Auth] Password reset error:', error.message);
-      } else if (data?.properties?.action_link) {
-        // Send the reset email ourselves via our SMTP
+        // Store hashed token in DB, expire after 15 min
+        await query(
+          `INSERT INTO password_reset_tokens (user_id, hashed_token, expires_at) 
+           VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
+          [userId, hashedToken]
+        );
+
+        const frontendUrl = redirectUrl || env.APP_URL;
+        const baseUrl = frontendUrl.endsWith('/') ? frontendUrl.slice(0, -1) : frontendUrl;
+        const resetLink = `${baseUrl}/#type=recovery&access_token=${token}`;
+        
         const { emailService } = await import('../../services/emailService');
         const { getBaseTemplate } = await import('../../templates/base');
-
-        // Use the original Supabase action_link — it must go through Supabase's
-        // /auth/v1/verify endpoint first so the hashed token gets exchanged for
-        // a real JWT access_token before redirecting to our frontend.
-        const resetLink = data.properties.action_link;
         
         const content = `
           <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 24px;">Reset Your Password</h2>
           <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
             We received a request to reset your password. Click the button below to choose a new password.
-            This link will expire in 1 hour.
+            This link will expire in 15 minutes.
           </p>
           <p style="margin: 0 0 10px; color: #94a3b8; font-size: 13px;">
             If you didn't request this, you can safely ignore this email.
@@ -193,24 +196,37 @@ export class AuthService {
   }
 
   /**
-   * Reset password (after user clicks email link, Supabase provides a session).
+   * Reset password via custom token.
    */
   async resetPassword(accessToken: string, newPassword: string) {
-    // 1. Verify the token and get the user
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
-    if (userError || !user?.id) {
+    const crypto = await import('crypto');
+    const hashedToken = crypto.createHash('sha256').update(accessToken).digest('hex');
+
+    // 1. Verify token
+    const { rows } = await query(
+      `SELECT user_id FROM password_reset_tokens 
+       WHERE hashed_token = $1 AND expires_at > NOW()`,
+      [hashedToken]
+    );
+
+    if (rows.length === 0) {
       throw new UnauthorizedError('Invalid or expired password reset token.');
     }
 
-    // 2. Use the user ID to update the password
+    const userId = rows[0].user_id;
+
+    // 2. Use the user ID to update the password securely
     const { error } = await supabaseAdmin.auth.admin.updateUserById(
-      user.id,
+      userId,
       { password: newPassword }
     );
 
     if (error) {
       throw new BadRequestError('Failed to reset password. Link may have expired.');
     }
+
+    // 3. Clean up the used token
+    await query(`DELETE FROM password_reset_tokens WHERE user_id = $1`, [userId]);
 
     return { message: 'Password reset successfully.' };
   }
