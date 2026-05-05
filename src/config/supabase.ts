@@ -6,6 +6,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env';
 
+import ws from 'ws';
+
 /**
  * Admin client — uses service role key for user management
  * (verify tokens, delete users, etc.)
@@ -14,6 +16,9 @@ export const supabaseAdmin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+  },
+  realtime: {
+    transport: ws,
   },
 });
 
@@ -25,5 +30,8 @@ export const supabasePublic = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_K
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+  },
+  realtime: {
+    transport: ws,
   },
 });
