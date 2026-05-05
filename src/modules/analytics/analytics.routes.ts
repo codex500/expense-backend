@@ -51,10 +51,16 @@ const ctrl = new AnalyticsController();
 const router = Router();
 router.use(authenticate as any);
 
+// v3 Spec Routes
+router.get('/summary', (req, res, next) => ctrl.dashboard(req as any, res, next));
+router.get('/category', (req, res, next) => ctrl.expenseByCategory(req as any, res, next));
+router.get('/monthly', (req, res, next) => ctrl.monthlyGraph(req as any, res, next));
+router.get('/trend', (req, res, next) => ctrl.spendingTrend(req as any, res, next));
+
+// v2 Aliases (for frontend compatibility until fully migrated)
 router.get('/dashboard', (req, res, next) => ctrl.dashboard(req as any, res, next));
 router.get('/expense-by-category', (req, res, next) => ctrl.expenseByCategory(req as any, res, next));
 router.get('/expense-by-account', (req, res, next) => ctrl.expenseByAccount(req as any, res, next));
-router.get('/monthly', (req, res, next) => ctrl.monthlyGraph(req as any, res, next));
 router.get('/weekly', (req, res, next) => ctrl.weeklyGraph(req as any, res, next));
 router.get('/payment-methods', (req, res, next) => ctrl.paymentMethodUsage(req as any, res, next));
 router.get('/six-month', (req, res, next) => ctrl.sixMonthComparison(req as any, res, next));

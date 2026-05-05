@@ -67,57 +67,7 @@ export class UsersService {
     return rows[0];
   }
 
-  async updatePreferences(userId: string, input: UpdatePreferencesInput) {
-    const sets: string[] = [];
-    const params: any[] = [];
-    let i = 1;
 
-    const fieldMap: Record<string, string> = {
-      defaultCurrency: 'default_currency',
-      themePreference: 'theme_preference',
-      notifyEmail: 'notify_email',
-      notifyPush: 'notify_push',
-      notifyBudget: 'notify_budget',
-      notifySalary: 'notify_salary',
-      notifyWeekly: 'notify_weekly',
-      notifyMonthly: 'notify_monthly',
-      notifyLowBalance: 'notify_low_balance',
-    };
-
-    for (const [key, col] of Object.entries(fieldMap)) {
-      if ((input as any)[key] !== undefined) {
-        sets.push(`${col} = $${i++}`);
-        params.push((input as any)[key]);
-      }
-    }
-
-    if (sets.length === 0) throw new BadRequestError('No preferences to update.');
-
-    params.push(userId);
-    await query(
-      `UPDATE user_profiles SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i}`,
-      params
-    );
-
-    return this.getProfile(userId);
-  }
-
-  async changePassword(userId: string, input: ChangePasswordInput) {
-    // Verify current password by attempting login
-    const { rows } = await query<{ email: string }>(
-      'SELECT email FROM user_profiles WHERE id = $1',
-      [userId]
-    );
-    if (rows.length === 0) throw new NotFoundError('User not found.');
-
-    // Update password via Supabase Admin
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-      password: input.newPassword,
-    });
-
-    if (error) throw new BadRequestError('Failed to update password.');
-    return { message: 'Password changed successfully.' };
-  }
 
   async deleteAccount(userId: string) {
     // Delete from Supabase Auth (profile will cascade via ON DELETE CASCADE)

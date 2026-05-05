@@ -24,6 +24,7 @@
   ],
   "license": "ISC",
   "dependencies": {
+    "@simplewebauthn/server": "^13.3.0",
     "@supabase/supabase-js": "^2.49.4",
     "compression": "^1.8.1",
     "connect-timeout": "^1.9.1",

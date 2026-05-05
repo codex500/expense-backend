@@ -55,4 +55,12 @@ export const env = {
 
   // Resend API Key
   RESEND_API_KEY: optional('RESEND_API_KEY', ''),
+
+  // Frontend URL (for CORS, redirects)
+  FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:5173'),
+
+  // WebAuthn / Passkeys
+  WEBAUTHN_RP_ID: optional('WEBAUTHN_RP_ID', 'localhost'),
+  WEBAUTHN_RP_NAME: optional('WEBAUTHN_RP_NAME', 'Trackify'),
+  WEBAUTHN_ORIGIN: optional('WEBAUTHN_ORIGIN', 'http://localhost:5173'),
 } as const;

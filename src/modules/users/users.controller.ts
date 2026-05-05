@@ -22,19 +22,7 @@ export class UsersController {
     } catch (err) { next(err); }
   }
 
-  async updatePreferences(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await usersService.updatePreferences(req.user.id, req.body);
-      sendSuccess(res, result, 'Preferences updated.');
-    } catch (err) { next(err); }
-  }
 
-  async changePassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await usersService.changePassword(req.user.id, req.body);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
 
   async deleteAccount(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {

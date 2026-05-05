@@ -15,7 +15,7 @@ router.post('/', validate({ body: createAccountSchema }), (req, res, next) => ac
 router.get('/', (req, res, next) => accountsController.getAll(req as any, res, next));
 router.get('/summary', (req, res, next) => accountsController.getSummary(req as any, res, next));
 router.get('/:id', validate({ params: accountIdParam }), (req, res, next) => accountsController.getById(req as any, res, next));
-router.put('/:id', validate({ params: accountIdParam, body: updateAccountSchema }), (req, res, next) => accountsController.update(req as any, res, next));
+router.patch('/:id', validate({ params: accountIdParam, body: updateAccountSchema }), (req, res, next) => accountsController.update(req as any, res, next));
 router.delete('/:id', validate({ params: accountIdParam }), (req, res, next) => accountsController.delete(req as any, res, next));
 router.post('/transfer', validate({ body: transferSchema }), (req, res, next) => accountsController.transfer(req as any, res, next));
 

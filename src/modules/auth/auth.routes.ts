@@ -28,9 +28,16 @@ router.get('/oauth/:provider', (req, res, next) => authController.getOAuthUrl(re
 
 // Protected routes
 router.post('/logout', authenticate as any, (req, res, next) => authController.logout(req as any, res, next));
-router.get('/session', authenticate as any, (req, res, next) => authController.getSession(req as any, res, next));
+router.get('/me', authenticate as any, (req, res, next) => authController.getMe(req as any, res, next));
 router.post('/onboarding', authenticate as any, validate({ body: onboardingSchema }), (req, res, next) => authController.completeOnboarding(req as any, res, next));
 router.put('/profile', authenticate as any, (req, res, next) => authController.updateProfile(req as any, res, next));
 router.delete('/account', authenticate as any, (req, res, next) => authController.deleteAccount(req as any, res, next));
+
+// Passkey Routes
+router.post('/passkey/register', authenticate as any, (req, res, next) => authController.registerPasskey(req as any, res, next));
+router.post('/passkey/verify-registration', authenticate as any, (req, res, next) => authController.verifyPasskeyRegistration(req as any, res, next));
+router.post('/passkey/generate-auth', (req, res, next) => authController.generatePasskeyAuth(req as any, res, next));
+router.post('/passkey/verify-auth', (req, res, next) => authController.verifyPasskeyAuth(req as any, res, next));
+router.delete('/passkey/remove', authenticate as any, (req, res, next) => authController.removePasskey(req as any, res, next));
 
 export default router;

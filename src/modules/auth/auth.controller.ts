@@ -86,10 +86,67 @@ export class AuthController {
     } catch (err) { next(err); }
   }
 
-  async getSession(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const result = await authService.getSession(req.user.id);
-      console.log('[DEBUG] getSession API response:', result);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  // Passkey Endpoints
+  async registerPasskey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { passkeyService } = await import('./passkey.service');
+      const result = await passkeyService.generateRegistration(req.user.id, req.user.email);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async verifyPasskeyRegistration(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { passkeyService } = await import('./passkey.service');
+      const { response, deviceName } = req.body;
+      const result = await passkeyService.verifyRegistration(req.user.id, response, deviceName);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async generatePasskeyAuth(req: Request, res: Response, next: NextFunction) {
+    try {
+      // Need user ID for this, so we take email first
+      const { email } = req.body;
+      const { query } = await import('../../config/database');
+      const { rows } = await query('SELECT id FROM user_profiles WHERE email = $1', [email]);
+      if (rows.length === 0) throw new Error('User not found');
+      
+      const { passkeyService } = await import('./passkey.service');
+      const result = await passkeyService.generateAuthentication(rows[0].id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async verifyPasskeyAuth(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, response } = req.body;
+      const { query } = await import('../../config/database');
+      const { rows } = await query('SELECT id FROM user_profiles WHERE email = $1', [email]);
+      if (rows.length === 0) throw new Error('User not found');
+      
+      const { passkeyService } = await import('./passkey.service');
+      const result = await passkeyService.verifyAuthentication(rows[0].id, response);
+      
+      // If verified, generate a new JWT session or use Supabase logic
+      // For now, we'll return the success verification
+      // In production, we'd need to create a custom token or session
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async removePasskey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const { passkeyService } = await import('./passkey.service');
+      const { passkeyId } = req.body;
+      const result = await passkeyService.removePasskey(req.user.id, passkeyId);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }

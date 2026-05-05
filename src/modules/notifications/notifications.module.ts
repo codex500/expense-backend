@@ -38,20 +38,18 @@ export class NotificationsService {
         };
     }
 
-    async markAsRead(userId: string, notificationId: string) {
-        await query(
-            `UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2`,
-            [notificationId, userId]
-        );
-        return { message: 'Marked as read' };
-    }
-
-    async markAllAsRead(userId: string) {
-         await query(
-            `UPDATE notifications SET is_read = true WHERE user_id = $1`,
-            [userId]
-        );
-        return { message: 'All marked as read' };
+    async markRead(userId: string, input: { ids?: string[], all?: boolean }) {
+        if (input.all) {
+            await query(`UPDATE notifications SET is_read = true WHERE user_id = $1`, [userId]);
+            return { message: 'All marked as read' };
+        }
+        
+        if (input.ids && input.ids.length > 0) {
+            await query(`UPDATE notifications SET is_read = true WHERE user_id = $1 AND id = ANY($2::uuid[])`, [userId, input.ids]);
+            return { message: 'Selected notifications marked as read' };
+        }
+        
+        return { message: 'No action taken' };
     }
 }
 
@@ -73,16 +71,14 @@ router.get('/', async (req: any, res, next) => {
     } catch(err) { next(err); }
 });
 
-router.put('/:id/read', validate({ params: notificationIdParam }), async (req: any, res, next) => {
-    try {
-        const result = await notificationsService.markAsRead(req.user.id, req.params.id as string);
-        sendSuccess(res, result);
-    } catch(err) { next(err); }
+const markReadSchema = z.object({
+    ids: z.array(z.string().uuid()).optional(),
+    all: z.boolean().optional(),
 });
 
-router.put('/read-all', async (req: any, res, next) => {
+router.patch('/read', validate({ body: markReadSchema }), async (req: any, res, next) => {
     try {
-        const result = await notificationsService.markAllAsRead(req.user.id);
+        const result = await notificationsService.markRead(req.user.id, req.body);
         sendSuccess(res, result);
     } catch(err) { next(err); }
 });

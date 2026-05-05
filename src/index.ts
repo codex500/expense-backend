@@ -41,6 +41,8 @@ import advisorRoutes from './modules/advisor/advisor.module';
 import notificationRoutes from './modules/notifications/notifications.module';
 import contactRoutes from './modules/contact/contact.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import settingsRoutes from './modules/settings/settings.routes';
+import reportsRoutes from './modules/reports/reports.module';
 
 const app = express();
 
@@ -87,6 +89,8 @@ apiRouter.use('/advisor', advisorRoutes);
 apiRouter.use('/notifications', notificationRoutes);
 apiRouter.use('/contact', contactRoutes);
 apiRouter.use('/dashboard', dashboardRoutes);
+apiRouter.use('/settings', settingsRoutes);
+apiRouter.use('/reports', reportsRoutes);
 
 app.use('/api', apiRouter);
 

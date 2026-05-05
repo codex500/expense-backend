@@ -21,3 +21,6 @@ dist/
 .vscode
 *.swp
 *.swo
+
+./test-email.ts
+./run-migration.js
