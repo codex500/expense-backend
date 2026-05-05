@@ -16,7 +16,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "ignoreDeprecations": "6.0",
     "typeRoots": [
       "./node_modules/@types",
       "./src/shared/types"
