@@ -1,37 +1,30 @@
-/**
- * Budgets controller
- */
-
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { budgetsService } from './budgets.service';
 import { sendSuccess, sendCreated } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types';
 
 export class BudgetsController {
-  async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async list(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await budgetsService.create(req.user.id, req.body);
-      sendCreated(res, result, 'Budget created.');
-    } catch (err) { next(err); }
-  }
-
-  async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await budgetsService.update(req.user.id, req.params.id as string, req.body);
-      sendSuccess(res, result, 'Budget updated.');
-    } catch (err) { next(err); }
-  }
-
-  async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await budgetsService.delete(req.user.id, req.params.id as string);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const month = req.query.month as string | undefined;
+      const result = await budgetsService.list(authReq.user.id, month);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async getCurrent(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async upsert(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await budgetsService.getCurrent(req.user.id);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await budgetsService.upsert(authReq.user.id, req.body);
+      sendCreated(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await budgetsService.delete(authReq.user.id, req.params.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }

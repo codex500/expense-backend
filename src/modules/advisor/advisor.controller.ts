@@ -1,16 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
-import { dashboardService } from './dashboard.service';
+import { advisorService } from './advisor.service';
 import { sendSuccess } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types';
 
-export class DashboardController {
-  async getSummary(req: Request, res: Response, next: NextFunction) {
+export class AdvisorController {
+  async getInsights(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
-      const result = await dashboardService.getSummary(authReq.user.id);
+      const result = await advisorService.getInsights(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 }
 
-export const dashboardController = new DashboardController();
+export const advisorController = new AdvisorController();

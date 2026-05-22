@@ -1,21 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { accountsService } from './accounts.service';
+import { categoriesService } from './categories.service';
 import { sendSuccess, sendCreated } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types';
 
-export class AccountsController {
+export class CategoriesController {
   async list(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
-      const result = await accountsService.list(authReq.user.id);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async getById(req: Request, res: Response, next: NextFunction) {
-    try {
-      const authReq = req as unknown as AuthenticatedRequest;
-      const result = await accountsService.getById(authReq.user.id, req.params.id);
+      const result = await categoriesService.list(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
@@ -23,7 +15,7 @@ export class AccountsController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
-      const result = await accountsService.create(authReq.user.id, req.body);
+      const result = await categoriesService.create(authReq.user.id, req.body);
       sendCreated(res, result);
     } catch (err) { next(err); }
   }
@@ -31,7 +23,7 @@ export class AccountsController {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
-      const result = await accountsService.update(authReq.user.id, req.params.id, req.body);
+      const result = await categoriesService.update(authReq.user.id, req.params.id, req.body);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
@@ -39,10 +31,10 @@ export class AccountsController {
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
-      const result = await accountsService.delete(authReq.user.id, req.params.id);
+      const result = await categoriesService.delete(authReq.user.id, req.params.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 }
 
-export const accountsController = new AccountsController();
+export const categoriesController = new CategoriesController();

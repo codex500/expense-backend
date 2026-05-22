@@ -41,11 +41,6 @@ export const env = {
   SUPABASE_ANON_KEY: required('SUPABASE_ANON_KEY'),
   SUPABASE_SERVICE_ROLE_KEY: required('SUPABASE_SERVICE_ROLE_KEY'),
 
-  // JWT
-  JWT_SECRET: required('JWT_SECRET'),
-  JWT_EXPIRY: optional('JWT_EXPIRY', '7d'),
-  JWT_REFRESH_EXPIRY: optional('JWT_REFRESH_EXPIRY', '30d'),
-
   // CORS
   CORS_ORIGIN: optional('CORS_ORIGIN', ''),
 
@@ -53,14 +48,9 @@ export const env = {
   RATE_LIMIT_WINDOW_MS: optionalInt('RATE_LIMIT_WINDOW_MS', 900_000),
   RATE_LIMIT_MAX: optionalInt('RATE_LIMIT_MAX', 100),
 
-  // Resend API Key
+  // Resend
   RESEND_API_KEY: optional('RESEND_API_KEY', ''),
 
-  // Frontend URL (for CORS, redirects)
+  // Frontend URL
   FRONTEND_URL: optional('FRONTEND_URL', 'http://localhost:5173'),
-
-  // WebAuthn / Passkeys
-  WEBAUTHN_RP_ID: optional('WEBAUTHN_RP_ID', 'localhost'),
-  WEBAUTHN_RP_NAME: optional('WEBAUTHN_RP_NAME', 'Trackify'),
-  WEBAUTHN_ORIGIN: optional('WEBAUTHN_ORIGIN', 'http://localhost:5173'),
 } as const;

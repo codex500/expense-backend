@@ -1,213 +1,183 @@
-/**
- * Passkey (WebAuthn) service — handles registration and verification of passkeys.
- */
-
-import {
-  generateRegistrationOptions,
-  verifyRegistrationResponse,
-  generateAuthenticationOptions,
-  verifyAuthenticationResponse,
-} from '@simplewebauthn/server';
-import type {
-  RegistrationResponseJSON,
-  AuthenticationResponseJSON,
-} from '@simplewebauthn/server';
+import { generateRegistrationOptions, verifyRegistrationResponse, generateAuthenticationOptions, verifyAuthenticationResponse } from '@simplewebauthn/server';
 import { query } from '../../config/database';
 import { env } from '../../config/env';
-import { BadRequestError, NotFoundError } from '../../shared/errors';
+import { BadRequestError, UnauthorizedError, NotFoundError } from '../../shared/errors';
 
-// In-memory challenge store (use Redis in production for multi-instance)
+const rpName = 'Trackify';
+const rpID = new URL(env.APP_URL).hostname;
+const origin = env.APP_URL.endsWith('/') ? env.APP_URL.slice(0, -1) : env.APP_URL;
+
+// Simple in-memory challenge store (for production, use Redis or DB)
 const challengeStore = new Map<string, string>();
 
 export class PasskeyService {
-  private rpID = env.WEBAUTHN_RP_ID;
-  private rpName = env.WEBAUTHN_RP_NAME;
-  private origin = env.WEBAUTHN_ORIGIN;
+  async generateRegistrationOptions(userId: string) {
+    // 1. Get user details
+    const { rows } = await query('SELECT email FROM public.user_profiles WHERE id = $1', [userId]);
+    if (!rows.length) throw new NotFoundError('User not found');
+    const userEmail = rows[0].email as string;
 
-  /**
-   * Generate registration options for a new passkey.
-   */
-  async generateRegistration(userId: string, email: string) {
-    // Get existing passkeys for this user
-    const { rows: existing } = await query(
-      'SELECT credential_id FROM passkeys WHERE user_id = $1',
-      [userId]
-    );
-
-    const excludeCredentials = existing.map((row: any) => ({
-      id: row.credential_id,
-      type: 'public-key' as const,
-    }));
+    // 2. Get existing passkeys to prevent re-registering
+    const { rows: existingPasskeys } = await query('SELECT credential_id FROM public.user_passkeys WHERE user_id = $1', [userId]);
 
     const options = await generateRegistrationOptions({
-      rpName: this.rpName,
-      rpID: this.rpID,
-      userName: email,
-      attestationType: 'none',
-      excludeCredentials,
+      rpName,
+      rpID,
+      userID: new Uint8Array(Buffer.from(userId)),
+      userName: userEmail,
+      excludeCredentials: existingPasskeys.map((pk: any) => ({
+        id: pk.credential_id as string,
+        type: 'public-key',
+      })),
       authenticatorSelection: {
-        residentKey: 'preferred',
+        residentKey: 'required',
         userVerification: 'preferred',
       },
+      attestationType: 'none',
     });
 
-    // Store challenge for verification
-    challengeStore.set(userId, options.challenge);
-
-    // Auto-expire challenge after 5 minutes
-    setTimeout(() => challengeStore.delete(userId), 5 * 60 * 1000);
+    challengeStore.set(`reg_${userId}`, options.challenge);
 
     return options;
   }
 
-  /**
-   * Verify registration response and store the new passkey.
-   */
-  async verifyRegistration(
-    userId: string,
-    response: RegistrationResponseJSON,
-    deviceName?: string
-  ) {
-    const expectedChallenge = challengeStore.get(userId);
+  async verifyRegistration(userId: string, body: any) {
+    const expectedChallenge = challengeStore.get(`reg_${userId}`);
     if (!expectedChallenge) {
-      throw new BadRequestError('Registration challenge expired. Please try again.');
+      throw new BadRequestError('Challenge expired or not found');
     }
 
-    const verification = await verifyRegistrationResponse({
-      response,
-      expectedChallenge,
-      expectedOrigin: this.origin,
-      expectedRPID: this.rpID,
-    });
+    challengeStore.delete(`reg_${userId}`);
 
-    if (!verification.verified || !verification.registrationInfo) {
-      throw new BadRequestError('Passkey verification failed.');
+    let verification;
+    try {
+      verification = await verifyRegistrationResponse({
+        response: body,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+      });
+    } catch (error: any) {
+      throw new BadRequestError(`Registration failed: ${error.message}`);
     }
 
-    const { credential, credentialDeviceType } = verification.registrationInfo;
+    if (verification.verified && verification.registrationInfo) {
+      const { credential, credentialDeviceType, credentialBackedUp } = verification.registrationInfo;
 
-    // Store passkey in database
-    await query(
-      `INSERT INTO passkeys (user_id, credential_id, public_key, counter, device_name, transports)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        userId,
-        Buffer.from(credential.id).toString('base64url'),
-        Buffer.from(credential.publicKey).toString('base64url'),
-        credential.counter,
-        deviceName || credentialDeviceType || 'Unknown Device',
-        response.response.transports || [],
-      ]
-    );
+      // Save passkey to DB
+      await query(
+        `INSERT INTO public.user_passkeys 
+         (user_id, credential_id, public_key, counter, device_type, backed_up, transports)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          userId,
+          credential.id,
+          Buffer.from(credential.publicKey),
+          credential.counter,
+          credentialDeviceType,
+          credentialBackedUp,
+          credential.transports ? credential.transports.join(',') : '',
+        ]
+      );
 
-    challengeStore.delete(userId);
-
-    return { verified: true, message: 'Passkey registered successfully.' };
+      return { verified: true };
+    }
+    
+    throw new BadRequestError('Registration verification failed');
   }
 
-  /**
-   * Generate authentication options for passkey login.
-   */
-  async generateAuthentication(userId: string) {
-    const { rows } = await query(
-      'SELECT credential_id, transports FROM passkeys WHERE user_id = $1',
-      [userId]
-    );
+  async generateAuthenticationOptions(email: string) {
+    const { rows: users } = await query('SELECT id FROM public.user_profiles WHERE email = $1', [email]);
+    if (!users.length) throw new NotFoundError('User not found');
+    const userId = users[0].id;
 
-    if (rows.length === 0) {
-      throw new NotFoundError('No passkeys registered for this user.');
-    }
-
-    const allowCredentials = rows.map((row: any) => ({
-      id: row.credential_id,
-      type: 'public-key' as const,
-      transports: row.transports || [],
-    }));
+    const { rows: passkeys } = await query('SELECT credential_id, transports FROM public.user_passkeys WHERE user_id = $1', [userId]);
 
     const options = await generateAuthenticationOptions({
-      rpID: this.rpID,
-      allowCredentials,
+      rpID,
+      allowCredentials: passkeys.map((pk: any) => ({
+        id: pk.credential_id,
+        type: 'public-key',
+        transports: pk.transports ? pk.transports.split(',') as any[] : undefined,
+      })),
       userVerification: 'preferred',
     });
 
-    challengeStore.set(userId, options.challenge);
-    setTimeout(() => challengeStore.delete(userId), 5 * 60 * 1000);
+    challengeStore.set(`auth_${email}`, options.challenge);
 
     return options;
   }
 
-  /**
-   * Verify authentication response for passkey login.
-   */
-  async verifyAuthentication(userId: string, response: AuthenticationResponseJSON) {
-    const expectedChallenge = challengeStore.get(userId);
+  async verifyAuthentication(email: string, body: any) {
+    const expectedChallenge = challengeStore.get(`auth_${email}`);
     if (!expectedChallenge) {
-      throw new BadRequestError('Authentication challenge expired. Please try again.');
+      throw new BadRequestError('Challenge expired or not found');
     }
+    challengeStore.delete(`auth_${email}`);
 
-    const credentialId = response.id;
+    const { rows: users } = await query('SELECT id, email, full_name FROM public.user_profiles WHERE email = $1', [email]);
+    if (!users.length) throw new NotFoundError('User not found');
+    const user = users[0];
+    const userId = user.id;
 
-    const { rows } = await query(
-      'SELECT credential_id, public_key, counter FROM passkeys WHERE user_id = $1 AND credential_id = $2',
-      [userId, credentialId]
+    // Get the passkey from DB
+    const { rows: passkeys } = await query(
+      'SELECT public_key, counter FROM public.user_passkeys WHERE credential_id = $1 AND user_id = $2',
+      [body.id, userId]
     );
 
-    if (rows.length === 0) {
-      throw new BadRequestError('Passkey not found.');
+    if (!passkeys.length) {
+      throw new UnauthorizedError('Passkey not found for this user');
     }
 
-    const passkey = rows[0];
+    const passkey = passkeys[0];
 
-    const verification = await verifyAuthenticationResponse({
-      response,
-      expectedChallenge,
-      expectedOrigin: this.origin,
-      expectedRPID: this.rpID,
-      credential: {
-        id: passkey.credential_id,
-        publicKey: Buffer.from(passkey.public_key, 'base64url'),
-        counter: Number(passkey.counter),
-      },
-    });
-
-    if (!verification.verified) {
-      throw new BadRequestError('Passkey authentication failed.');
+    let verification;
+    try {
+      verification = await verifyAuthenticationResponse({
+        response: body,
+        expectedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpID,
+        credential: {
+          id: passkey.credential_id || body.id,
+          publicKey: new Uint8Array(passkey.public_key as any),
+          counter: Number(passkey.counter),
+          transports: passkey.transports ? (passkey.transports as string).split(',') as any[] : undefined,
+        },
+      });
+    } catch (error: any) {
+      throw new UnauthorizedError(`Authentication failed: ${error.message}`);
     }
 
-    // Update counter
-    await query(
-      'UPDATE passkeys SET counter = $1 WHERE credential_id = $2 AND user_id = $3',
-      [verification.authenticationInfo.newCounter, credentialId, userId]
-    );
+    if (verification.verified) {
+      // Update counter
+      await query(
+        'UPDATE public.user_passkeys SET counter = $1 WHERE credential_id = $2',
+        [verification.authenticationInfo.newCounter, body.id]
+      );
 
-    challengeStore.delete(userId);
+      // Mint a JWT
+      const jwt = require('jsonwebtoken');
+      const token = jwt.sign(
+        {
+          aud: 'authenticated',
+          role: 'authenticated',
+          sub: userId,
+          email: user.email
+        },
+        process.env.JWT_SECRET || '',
+        { expiresIn: process.env.JWT_EXPIRY || '7d' }
+      );
 
-    return { verified: true, message: 'Passkey verified successfully.' };
-  }
-
-  /**
-   * List all passkeys for a user.
-   */
-  async listPasskeys(userId: string) {
-    const { rows } = await query(
-      'SELECT id, device_name, created_at FROM passkeys WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
-    );
-    return rows;
-  }
-
-  /**
-   * Remove a passkey.
-   */
-  async removePasskey(userId: string, passkeyId: string) {
-    const { rowCount } = await query(
-      'DELETE FROM passkeys WHERE id = $1 AND user_id = $2',
-      [passkeyId, userId]
-    );
-    if (rowCount === 0) {
-      throw new NotFoundError('Passkey not found.');
+      return { 
+        verified: true, 
+        user: { id: user.id, email: user.email, name: user.full_name }, 
+        token 
+      };
     }
-    return { message: 'Passkey removed successfully.' };
+
+    throw new UnauthorizedError('Authentication verification failed');
   }
 }
 

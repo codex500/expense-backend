@@ -1,130 +1,194 @@
 /**
- * Expense Tracker API - Entry point
- * Production-ready TypeScript Architecture
+ * Trackify API v4 — Production Entry Point
+ *
+ * Architecture: Express + Supabase Auth + PostgreSQL (via pg pool)
+ * Auth: Supabase JWT only — no custom JWT generation
+ * Database: Direct pg pool (Supabase Transaction Pooler on :6543)
  */
 
-import { env } from './config/env';
-
-// Handle Uncaught Errors
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (err: any) => {
-  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  process.exit(1);
-});
+import dns from 'dns';
+// Force IPv4 DNS resolution — prevents ENETUNREACH on Render/cloud hosts
+dns.setDefaultResultOrder('ipv4first');
 
 import express from 'express';
-import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
+import cors from 'cors';
+import morgan from 'morgan';
+import { env } from './config/env';
+import { pool } from './config/database';
 import { errorHandler } from './shared/middleware/errorHandler';
 import { apiLimiter } from './shared/middleware/rateLimiter';
-import compression from 'compression';
-import morgan from 'morgan';
-import timeout from 'connect-timeout';
-import pool from './config/database';
 import { setupCronJobs } from './jobs/cron';
 
-// Routes
+// Module route imports
 import authRoutes from './modules/auth/auth.routes';
-import userRoutes from './modules/users/users.routes';
-import accountRoutes from './modules/accounts/accounts.routes';
-import transactionRoutes from './modules/transactions/transactions.routes';
-import budgetRoutes from './modules/budgets/budgets.routes';
-import salaryRoutes from './modules/salary/salary.module';
-import analyticsRoutes from './modules/analytics/analytics.routes';
-import advisorRoutes from './modules/advisor/advisor.module';
-import notificationRoutes from './modules/notifications/notifications.module';
-import contactRoutes from './modules/contact/contact.routes';
+import accountsRoutes from './modules/accounts/accounts.routes';
+import categoriesRoutes from './modules/categories/categories.routes';
+import transactionsRoutes from './modules/transactions/transactions.routes';
+import budgetsRoutes from './modules/budgets/budgets.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
-import settingsRoutes from './modules/settings/settings.routes';
-import reportsRoutes from './modules/reports/reports.module';
+import analyticsRoutes from './modules/analytics/analytics.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
+import advisorRoutes from './modules/advisor/advisor.routes';
+import contactRoutes from './modules/contact/contact.routes';
 
 const app = express();
 
+// ═══════════════════════════════════════════════════════════
+// GLOBAL MIDDLEWARE
+// ═══════════════════════════════════════════════════════════
+
+// Trust proxy for Render / Cloudflare (MUST be first)
 app.set('trust proxy', 1);
 
-// Security Middlewares
-app.use(helmet());
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: false,
+}));
+
+// Response compression
 app.use(compression());
-app.use(morgan('dev')); // Request logging
-app.use(timeout('30s')); // Timeout handling
-app.use((req, res, next) => {
-  if (!req.timedout) next();
-});
+
+// CORS
+const allowedOrigins = env.CORS_ORIGIN
+  ? env.CORS_ORIGIN.split(',').map((o) => o.trim().replace(/\/$/, ''))
+  : [];
+
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, health checks)
     if (!origin) return callback(null, true);
-    const allowed = env.CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
-    if (allowed.includes(origin) || origin === env.APP_URL) {
+    const cleanOrigin = origin.trim().replace(/\/$/, '');
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(cleanOrigin)) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
 
+// Request parsing
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
-// Global Rate Limiter
+// Request logging
+if (!env.IS_PRODUCTION) {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Rate limiting
 app.use('/api/', apiLimiter);
 
-// API Routes
-const apiRouter = express.Router();
-
-apiRouter.use('/auth', authRoutes);
-apiRouter.use('/users', userRoutes);
-apiRouter.use('/accounts', accountRoutes);
-apiRouter.use('/transactions', transactionRoutes);
-apiRouter.use('/budgets', budgetRoutes);
-apiRouter.use('/salary', salaryRoutes);
-apiRouter.use('/analytics', analyticsRoutes);
-apiRouter.use('/advisor', advisorRoutes);
-apiRouter.use('/notifications', notificationRoutes);
-apiRouter.use('/contact', contactRoutes);
-apiRouter.use('/dashboard', dashboardRoutes);
-apiRouter.use('/settings', settingsRoutes);
-apiRouter.use('/reports', reportsRoutes);
-
-app.use('/api', apiRouter);
-
-// Health Check
-app.get('/health', (req, res) => {
-  res.send("OK");
+// ═══════════════════════════════════════════════════════════
+// HEALTH CHECK
+// ═══════════════════════════════════════════════════════════
+app.get('/health', async (_req, res) => {
+  try {
+    const dbCheck = await pool.query('SELECT 1');
+    res.status(200).json({
+      status: 'healthy',
+      version: '4.0.0',
+      timestamp: new Date().toISOString(),
+      database: dbCheck ? 'connected' : 'disconnected',
+      uptime: process.uptime(),
+    });
+  } catch {
+    res.status(503).json({
+      status: 'unhealthy',
+      database: 'disconnected',
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
-// Root
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Expense Tracker API v2',
-    version: '2.0.0',
-    docs: '/api/docs'
+// ═══════════════════════════════════════════════════════════
+// API ROUTES
+// ═══════════════════════════════════════════════════════════
+app.use('/api/auth', authRoutes);
+app.use('/api/accounts', accountsRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/transactions', transactionsRoutes);
+app.use('/api/budgets', budgetsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/advisor', advisorRoutes);
+app.use('/api/contact', contactRoutes);
+
+// ═══════════════════════════════════════════════════════════
+// 404 HANDLER
+// ═══════════════════════════════════════════════════════════
+app.use((_req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found.',
+    code: 'NOT_FOUND',
   });
 });
 
-// 404 Handler
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found.' });
-});
-
-// Global Error Handler
+// ═══════════════════════════════════════════════════════════
+// GLOBAL ERROR HANDLER
+// ═══════════════════════════════════════════════════════════
 app.use(errorHandler);
 
-// Start Server
-app.listen(env.PORT, '0.0.0.0', () => {
-  console.info(`🚀 Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
-  
-  // Warm up database connection
-  pool.query('SELECT 1')
-    .then(() => console.info('✅ Database connected to Supabase Pooler'))
-    .catch((err) => console.warn('⚠️ Database connection warning:', err.message));
-    
-  // Start Cron Jobs
+// ═══════════════════════════════════════════════════════════
+// START SERVER
+// ═══════════════════════════════════════════════════════════
+const PORT = env.PORT;
+
+const server = app.listen(PORT, () => {
+  console.info(`
+╔══════════════════════════════════════════════╗
+║           TRACKIFY API v4.0.0                ║
+║──────────────────────────────────────────────║
+║  Port:      ${String(PORT).padEnd(33)}║
+║  Env:       ${env.NODE_ENV.padEnd(33)}║
+║  Database:  Supabase PostgreSQL              ║
+║  Auth:      Supabase Auth (JWT)              ║
+╚══════════════════════════════════════════════╝
+  `);
+
+  // Setup cron jobs after server starts
   setupCronJobs();
 });
+
+// Graceful shutdown
+const gracefulShutdown = (signal: string) => {
+  console.info(`\n[${signal}] Shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      await pool.end();
+      console.info('[Shutdown] Database pool closed.');
+    } catch (err) {
+      console.error('[Shutdown] Error closing pool:', err);
+    }
+    process.exit(0);
+  });
+
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error('[Shutdown] Forced exit after timeout.');
+    process.exit(1);
+  }, 10_000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Catch unhandled errors
+process.on('unhandledRejection', (reason) => {
+  console.error('[UnhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[UncaughtException]', error);
+  gracefulShutdown('UncaughtException');
+});
+
+export default app;

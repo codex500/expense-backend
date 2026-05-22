@@ -51,27 +51,8 @@ export function errorHandler(
     return;
   }
 
-  // Handle JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    res.status(401).json({
-      success: false,
-      message: 'Invalid token.',
-      code: 'INVALID_TOKEN',
-    });
-    return;
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    res.status(401).json({
-      success: false,
-      message: 'Token expired.',
-      code: 'TOKEN_EXPIRED',
-    });
-    return;
-  }
-
   // Handle PostgreSQL unique constraint violations
-  if ((err as any).code === '23505') {
+  if ((err as unknown as Record<string, unknown>).code === '23505') {
     res.status(409).json({
       success: false,
       message: 'A record with this data already exists.',
@@ -80,8 +61,8 @@ export function errorHandler(
     return;
   }
 
-  // Handle PostgreSQL check constraint violations (e.g., negative balance)
-  if ((err as any).code === '23514') {
+  // Handle PostgreSQL check constraint violations
+  if ((err as unknown as Record<string, unknown>).code === '23514') {
     res.status(400).json({
       success: false,
       message: 'Operation violates data constraints (e.g., insufficient balance).',
@@ -90,17 +71,30 @@ export function errorHandler(
     return;
   }
 
-  // Handle Timeout errors
-  if ((err as any).code === 'ETIMEDOUT' || err.message?.includes('Response timeout')) {
+  // Handle PostgreSQL foreign key violations
+  if ((err as unknown as Record<string, unknown>).code === '23503') {
+    res.status(400).json({
+      success: false,
+      message: 'Referenced resource does not exist.',
+      code: 'FOREIGN_KEY_VIOLATION',
+    });
+    return;
+  }
+
+  // Handle timeout errors
+  if ((err as unknown as Record<string, unknown>).code === 'ETIMEDOUT' || err.message?.includes('timeout')) {
     res.status(503).json({
       success: false,
-      message: 'Request timeout.',
+      message: 'Request timeout. Please try again.',
       code: 'REQUEST_TIMEOUT',
     });
     return;
   }
 
-  // Unknown errors
-  console.error(err);
-  res.status(500).json({ message: "Server error" });
+  // Unknown errors — never leak details in production
+  res.status(500).json({
+    success: false,
+    message: env.IS_PRODUCTION ? 'Internal server error.' : err.message,
+    code: 'INTERNAL_ERROR',
+  });
 }

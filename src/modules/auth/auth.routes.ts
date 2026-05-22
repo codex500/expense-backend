@@ -12,32 +12,92 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  refreshSchema,
   onboardingSchema,
+  updateProfileSchema,
 } from './auth.validation';
 
 const router = Router();
 
-// Public routes
-router.post('/signup', authLimiter, validate({ body: signupSchema }), (req, res, next) => authController.signup(req, res, next));
-router.post('/login', authLimiter, validate({ body: loginSchema }), (req, res, next) => authController.login(req, res, next));
-router.post('/forgot-password', emailLimiter, validate({ body: forgotPasswordSchema }), (req, res, next) => authController.forgotPassword(req, res, next));
-router.post('/reset-password', validate({ body: resetPasswordSchema }), (req, res, next) => authController.resetPassword(req as any, res, next));
-router.post('/verify-otp', authLimiter, (req, res, next) => authController.verifyOtp(req, res, next));
-router.post('/resend-otp', emailLimiter, (req, res, next) => authController.resendOtp(req, res, next));
-router.get('/oauth/:provider', (req, res, next) => authController.getOAuthUrl(req, res, next));
+// ─── Public Routes ─────────────────────────────────────
+router.post('/signup',
+  authLimiter,
+  validate({ body: signupSchema }),
+  (req, res, next) => authController.signup(req, res, next)
+);
 
-// Protected routes
-router.post('/logout', authenticate as any, (req, res, next) => authController.logout(req as any, res, next));
-router.get('/me', authenticate as any, (req, res, next) => authController.getMe(req as any, res, next));
-router.post('/onboarding', authenticate as any, validate({ body: onboardingSchema }), (req, res, next) => authController.completeOnboarding(req as any, res, next));
-router.put('/profile', authenticate as any, (req, res, next) => authController.updateProfile(req as any, res, next));
-router.delete('/account', authenticate as any, (req, res, next) => authController.deleteAccount(req as any, res, next));
+router.post('/login',
+  authLimiter,
+  validate({ body: loginSchema }),
+  (req, res, next) => authController.login(req, res, next)
+);
 
-// Passkey Routes
-router.post('/passkey/register', authenticate as any, (req, res, next) => authController.registerPasskey(req as any, res, next));
-router.post('/passkey/verify-registration', authenticate as any, (req, res, next) => authController.verifyPasskeyRegistration(req as any, res, next));
-router.post('/passkey/generate-auth', (req, res, next) => authController.generatePasskeyAuth(req as any, res, next));
-router.post('/passkey/verify-auth', (req, res, next) => authController.verifyPasskeyAuth(req as any, res, next));
-router.delete('/passkey/remove', authenticate as any, (req, res, next) => authController.removePasskey(req as any, res, next));
+router.post('/refresh',
+  authLimiter,
+  validate({ body: refreshSchema }),
+  (req, res, next) => authController.refresh(req, res, next)
+);
+
+router.post('/forgot-password',
+  emailLimiter,
+  validate({ body: forgotPasswordSchema }),
+  (req, res, next) => authController.forgotPassword(req, res, next)
+);
+
+router.post('/reset-password',
+  validate({ body: resetPasswordSchema }),
+  (req, res, next) => authController.resetPassword(req, res, next)
+);
+
+router.get('/oauth/:provider',
+  (req, res, next) => authController.getOAuthUrl(req, res, next)
+);
+
+// ─── Protected Routes ──────────────────────────────────
+router.post('/logout',
+  authenticate as any,
+  (req, res, next) => authController.logout(req, res, next)
+);
+
+router.get('/me',
+  authenticate as any,
+  (req, res, next) => authController.getMe(req, res, next)
+);
+
+router.post('/onboarding',
+  authenticate as any,
+  validate({ body: onboardingSchema }),
+  (req, res, next) => authController.completeOnboarding(req, res, next)
+);
+
+router.put('/profile',
+  authenticate as any,
+  validate({ body: updateProfileSchema }),
+  (req, res, next) => authController.updateProfile(req, res, next)
+);
+
+router.delete('/account',
+  authenticate as any,
+  (req, res, next) => authController.deleteAccount(req, res, next)
+);
+
+// ─── Passkey Routes ──────────────────────────────────────
+router.get('/passkey/register/options',
+  authenticate as any,
+  (req, res, next) => authController.generateRegistrationOptions(req, res, next)
+);
+
+router.post('/passkey/register/verify',
+  authenticate as any,
+  (req, res, next) => authController.verifyRegistration(req, res, next)
+);
+
+router.post('/passkey/authenticate/options',
+  (req, res, next) => authController.generateAuthenticationOptions(req, res, next)
+);
+
+router.post('/passkey/authenticate/verify',
+  (req, res, next) => authController.verifyAuthentication(req, res, next)
+);
 
 export default router;

@@ -1,7 +1,7 @@
 /**
  * PostgreSQL connection pool (pg / node-postgres)
  * Compatible with Supabase Transaction Pooler.
- * Forces IPv4 to prevent ENETUNREACH on Render/Railway.
+ * Forces IPv4 to prevent ENETUNREACH on cloud hosts.
  */
 
 import { Pool, PoolClient } from 'pg';
@@ -11,7 +11,7 @@ import { env } from './env';
 // Force IPv4 DNS — Supabase hosts may resolve to IPv6 first
 dns.setDefaultResultOrder('ipv4first');
 
-let connectionString = env.DATABASE_URL.replace(/^[\"']|[\"']$/g, '');
+let connectionString = env.DATABASE_URL.replace(/^["']|["']$/g, '');
 
 if (connectionString.startsWith('postgres://')) {
   connectionString = 'postgresql://' + connectionString.slice(11);
@@ -34,16 +34,18 @@ pool.on('error', (err) => {
 });
 
 /**
- * Execute a query with parameterized values.
+ * Execute a parameterized query.
  */
-export async function query<T = any>(text: string, params?: any[]): Promise<{ rows: T[]; rowCount: number | null }> {
+export async function query<T = Record<string, unknown>>(
+  text: string,
+  params?: unknown[]
+): Promise<{ rows: T[]; rowCount: number | null }> {
   const result = await pool.query(text, params);
   return { rows: result.rows as T[], rowCount: result.rowCount };
 }
 
 /**
  * Get a client from the pool for manual transaction management.
- * ALWAYS release the client in a finally block.
  */
 export async function getClient(): Promise<PoolClient> {
   return pool.connect();
@@ -51,12 +53,11 @@ export async function getClient(): Promise<PoolClient> {
 
 /**
  * Execute a function within a database transaction.
- * Automatically begins, commits on success, rolls back on error.
- * Uses SERIALIZABLE isolation for money-critical operations.
+ * Uses READ COMMITTED by default (sufficient with FOR UPDATE locks).
  */
 export async function withTransaction<T>(
   fn: (client: PoolClient) => Promise<T>,
-  isolationLevel: 'READ COMMITTED' | 'REPEATABLE READ' | 'SERIALIZABLE' = 'SERIALIZABLE'
+  isolationLevel: 'READ COMMITTED' | 'REPEATABLE READ' | 'SERIALIZABLE' = 'READ COMMITTED'
 ): Promise<T> {
   const client = await pool.connect();
   try {

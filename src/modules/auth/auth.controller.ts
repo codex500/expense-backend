@@ -24,18 +24,25 @@ export class AuthController {
     } catch (err) { next(err); }
   }
 
-  async logout(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async refresh(req: Request, res: Response, next: NextFunction) {
     try {
-      const token = req.headers.authorization?.slice(7) || '';
-      const result = await authService.logout(token);
+      const { refreshToken } = req.body;
+      const result = await authService.refreshSession(refreshToken);
+      sendSuccess(res, result, 'Token refreshed.');
+    } catch (err) { next(err); }
+  }
+
+  async logout(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await authService.logout(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
   async forgotPassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const redirectUrl = env.APP_URL;
-      const result = await authService.forgotPassword(req.body.email, redirectUrl);
+      const result = await authService.forgotPassword(req.body.email);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
@@ -48,113 +55,81 @@ export class AuthController {
     } catch (err) { next(err); }
   }
 
-  async verifyOtp(req: Request, res: Response, next: NextFunction) {
+  async updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, otp } = req.body;
-      const result = await authService.verifyOtp(email, otp);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async resendOtp(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await authService.resendOtp(req.body.email);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async updateProfile(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await authService.updateProfile(req.user.id, req.body);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await authService.updateProfile(authReq.user.id, req.body);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
   async getOAuthUrl(req: Request, res: Response, next: NextFunction) {
     try {
-      const provider = req.params.provider as 'google' | 'apple' | 'azure';
-      const redirectUrl = (req.query.redirect as string) || `${env.APP_URL}/auth/callback`;
+      const provider = req.params.provider as 'google';
+      const redirectUrl = (req.query.redirect as string) || `${env.APP_URL}auth/callback`;
       const result = await authService.getOAuthUrl(provider, redirectUrl);
+      res.redirect(result.url);
+    } catch (err) { next(err); }
+  }
+
+  async completeOnboarding(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await authService.completeOnboarding(authReq.user.id, req.body);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async completeOnboarding(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async getMe(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await authService.completeOnboarding(req.user.id, req.body);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await authService.getSession(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async deleteAccount(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await authService.getSession(req.user.id);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await authService.deleteAccount(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  // Passkey Endpoints
-  async registerPasskey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  // --- Passkey Methods ---
+  async generateRegistrationOptions(req: Request, res: Response, next: NextFunction) {
     try {
+      const authReq = req as unknown as AuthenticatedRequest;
       const { passkeyService } = await import('./passkey.service');
-      const result = await passkeyService.generateRegistration(req.user.id, req.user.email);
+      const result = await passkeyService.generateRegistrationOptions(authReq.user.id);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async verifyPasskeyRegistration(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async verifyRegistration(req: Request, res: Response, next: NextFunction) {
     try {
+      const authReq = req as unknown as AuthenticatedRequest;
       const { passkeyService } = await import('./passkey.service');
-      const { response, deviceName } = req.body;
-      const result = await passkeyService.verifyRegistration(req.user.id, response, deviceName);
+      const result = await passkeyService.verifyRegistration(authReq.user.id, req.body);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async generatePasskeyAuth(req: Request, res: Response, next: NextFunction) {
+  async generateAuthenticationOptions(req: Request, res: Response, next: NextFunction) {
     try {
-      // Need user ID for this, so we take email first
       const { email } = req.body;
-      const { query } = await import('../../config/database');
-      const { rows } = await query('SELECT id FROM user_profiles WHERE email = $1', [email]);
-      if (rows.length === 0) throw new Error('User not found');
-      
       const { passkeyService } = await import('./passkey.service');
-      const result = await passkeyService.generateAuthentication(rows[0].id);
+      const result = await passkeyService.generateAuthenticationOptions(email);
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 
-  async verifyPasskeyAuth(req: Request, res: Response, next: NextFunction) {
+  async verifyAuthentication(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, response } = req.body;
-      const { query } = await import('../../config/database');
-      const { rows } = await query('SELECT id FROM user_profiles WHERE email = $1', [email]);
-      if (rows.length === 0) throw new Error('User not found');
-      
       const { passkeyService } = await import('./passkey.service');
-      const result = await passkeyService.verifyAuthentication(rows[0].id, response);
-      
-      // If verified, generate a new JWT session or use Supabase logic
-      // For now, we'll return the success verification
-      // In production, we'd need to create a custom token or session
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async removePasskey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const { passkeyService } = await import('./passkey.service');
-      const { passkeyId } = req.body;
-      const result = await passkeyService.removePasskey(req.user.id, passkeyId);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async deleteAccount(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await authService.deleteAccount(req.user.id);
-      sendSuccess(res, result);
+      const result = await passkeyService.verifyAuthentication(email, response);
+      sendSuccess(res, result, 'Login successful with Passkey.');
     } catch (err) { next(err); }
   }
 }

@@ -14,15 +14,11 @@ export interface AuthUser {
 
 /** Extended Express Request with authenticated user */
 export interface AuthenticatedRequest extends Request {
-  user?: any;
-  body: any;
-  params: any;
-  query: any;
-  headers: any;
+  user: AuthUser;
 }
 
 /** Standard API response envelope */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data?: T;
@@ -50,41 +46,12 @@ export type BudgetScope = 'overall' | 'category' | 'account';
 
 /** Notification types */
 export type NotificationType =
-  | 'salary_reminder'
   | 'budget_warning'
   | 'budget_exceeded'
   | 'monthly_report'
   | 'weekly_summary'
-  | 'low_balance'
-  | 'recurring_payment'
   | 'welcome'
   | 'general';
 
-/** Email template types */
-export type EmailTemplateType =
-  | 'welcome'
-  | 'email_verification'
-  | 'password_reset'
-  | 'daily_reminder'
-  | 'budget_warning'
-  | 'salary_reminder'
-  | 'weekly_summary'
-  | 'monthly_report'
-  | 'low_balance';
-
 /** Theme preference */
 export type ThemePreference = 'light' | 'dark' | 'system';
-
-/** Default transaction categories */
-export const DEFAULT_CATEGORIES = [
-  'Food',
-  'Travel',
-  'Bills',
-  'Shopping',
-  'Entertainment',
-  'Salary',
-  'EMI',
-  'Health',
-  'Education',
-  'Other',
-] as const;

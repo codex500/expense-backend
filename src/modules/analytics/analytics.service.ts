@@ -1,5 +1,5 @@
 /**
- * Analytics service — comprehensive financial analytics.
+ * Analytics service — spending trends, category breakdowns, and insights.
  */
 
 import { query } from '../../config/database';
@@ -7,213 +7,200 @@ import { percentageChange } from '../../shared/utils/money';
 
 export class AnalyticsService {
 
-  /** Total income for a date range */
-  async totalIncome(userId: string, startDate?: string, endDate?: string) {
-    const { rows } = await query(
-      `SELECT COALESCE(SUM(amount_paise), 0) AS total FROM transactions
-       WHERE user_id = $1 AND type = 'income'
-       ${startDate ? 'AND transaction_date >= $2' : ''}
-       ${endDate ? `AND transaction_date <= $${startDate ? 3 : 2}` : ''}`,
-      [userId, ...(startDate ? [startDate] : []), ...(endDate ? [endDate] : [])]
-    );
-    return Number(rows[0].total);
-  }
-
-  /** Total expense for a date range */
-  async totalExpense(userId: string, startDate?: string, endDate?: string) {
-    const { rows } = await query(
-      `SELECT COALESCE(SUM(amount_paise), 0) AS total FROM transactions
-       WHERE user_id = $1 AND type = 'expense'
-       ${startDate ? 'AND transaction_date >= $2' : ''}
-       ${endDate ? `AND transaction_date <= $${startDate ? 3 : 2}` : ''}`,
-      [userId, ...(startDate ? [startDate] : []), ...(endDate ? [endDate] : [])]
-    );
-    return Number(rows[0].total);
-  }
-
-  /** Complete dashboard summary */
-  async getDashboard(userId: string) {
-    const now = new Date();
-    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
-    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
-
-    // Current month stats
-    const { rows: [currentStats] } = await query(
+  async getAnalytics(userId: string, months: number = 6) {
+    // Monthly trend data
+    const { rows: monthlyData } = await query<{
+      month: string;
+      type: string;
+      total: string;
+      count: string;
+    }>(
       `SELECT 
-         COALESCE(SUM(amount_paise) FILTER (WHERE type = 'income'), 0) AS income_paise,
-         COALESCE(SUM(amount_paise) FILTER (WHERE type = 'expense'), 0) AS expense_paise,
-         COUNT(*) FILTER (WHERE type = 'expense') AS expense_count
+         DATE_TRUNC('month', transaction_date)::date AS month,
+         type,
+         COALESCE(SUM(amount_paise), 0) AS total,
+         COUNT(*) AS count
        FROM transactions
-       WHERE user_id = $1 AND transaction_date >= $2`,
-      [userId, currentMonthStart]
-    );
-
-    // Previous month stats for comparison
-    const { rows: [prevStats] } = await query(
-      `SELECT 
-         COALESCE(SUM(amount_paise) FILTER (WHERE type = 'income'), 0) AS income_paise,
-         COALESCE(SUM(amount_paise) FILTER (WHERE type = 'expense'), 0) AS expense_paise
-       FROM transactions
-       WHERE user_id = $1 AND transaction_date >= $2 AND transaction_date <= $3`,
-      [userId, lastMonthStart, lastMonthEnd]
-    );
-
-    const currentIncome = Number(currentStats.income_paise);
-    const currentExpense = Number(currentStats.expense_paise);
-    const prevIncome = Number(prevStats.income_paise);
-    const prevExpense = Number(prevStats.expense_paise);
-
-    return {
-      currentMonth: {
-        incomePaise: currentIncome,
-        expensePaise: currentExpense,
-        savingsPaise: currentIncome - currentExpense,
-        expenseCount: Number(currentStats.expense_count),
-      },
-      trends: {
-        incomeChange: percentageChange(currentIncome, prevIncome),
-        expenseChange: percentageChange(currentExpense, prevExpense),
-      },
-    };
-  }
-
-  /** Expense breakdown by category */
-  async expenseByCategory(userId: string, startDate?: string, endDate?: string) {
-    let whereClause = "WHERE user_id = $1 AND type = 'expense'";
-    const params: any[] = [userId];
-    let idx = 2;
-
-    if (startDate) { whereClause += ` AND transaction_date >= $${idx++}`; params.push(startDate); }
-    if (endDate) { whereClause += ` AND transaction_date <= $${idx++}`; params.push(endDate); }
-
-    const { rows } = await query(
-      `SELECT category, SUM(amount_paise) AS total_paise, COUNT(*) AS count
-       FROM transactions ${whereClause}
-       GROUP BY category ORDER BY total_paise DESC`,
-      params
-    );
-
-    const grandTotal = rows.reduce((sum, r) => sum + Number(r.total_paise), 0);
-
-    return rows.map(r => ({
-      category: r.category,
-      totalPaise: Number(r.total_paise),
-      count: Number(r.count),
-      percentage: grandTotal > 0 ? Math.round((Number(r.total_paise) / grandTotal) * 100) : 0,
-    }));
-  }
-
-  /** Expense breakdown by account */
-  async expenseByAccount(userId: string, startDate?: string, endDate?: string) {
-    let whereClause = "WHERE t.user_id = $1 AND t.type = 'expense'";
-    const params: any[] = [userId];
-    let idx = 2;
-
-    if (startDate) { whereClause += ` AND t.transaction_date >= $${idx++}`; params.push(startDate); }
-    if (endDate) { whereClause += ` AND t.transaction_date <= $${idx++}`; params.push(endDate); }
-
-    const { rows } = await query(
-      `SELECT a.id, a.account_name, a.type AS account_type, SUM(t.amount_paise) AS total_paise
-       FROM transactions t JOIN accounts a ON t.account_id = a.id
-       ${whereClause}
-       GROUP BY a.id, a.account_name, a.type ORDER BY total_paise DESC`,
-      params
-    );
-
-    return rows.map(r => ({
-      accountId: r.id,
-      accountName: r.account_name,
-      accountType: r.account_type,
-      totalPaise: Number(r.total_paise),
-    }));
-  }
-
-  /** Monthly income/expense data for graphs */
-  async monthlyGraph(userId: string, months: number = 6) {
-    const { rows } = await query(
-      `SELECT DATE_TRUNC('month', transaction_date)::date AS month,
-              COALESCE(SUM(amount_paise) FILTER (WHERE type = 'income'), 0) AS income_paise,
-              COALESCE(SUM(amount_paise) FILTER (WHERE type = 'expense'), 0) AS expense_paise
-       FROM transactions
-       WHERE user_id = $1 AND transaction_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month' * $2
-       GROUP BY DATE_TRUNC('month', transaction_date)::date
+       WHERE user_id = $1 
+         AND transaction_date >= (CURRENT_DATE - ($2 * INTERVAL '1 month'))::date
+       GROUP BY month, type
        ORDER BY month ASC`,
       [userId, months]
     );
 
-    return rows.map(r => ({
-      month: r.month,
-      incomePaise: Number(r.income_paise),
-      expensePaise: Number(r.expense_paise),
-      savingsPaise: Number(r.income_paise) - Number(r.expense_paise),
-    }));
-  }
-
-  /** Weekly daily spending data */
-  async weeklyGraph(userId: string) {
-    const { rows } = await query(
-      `SELECT transaction_date::date AS day,
-              COALESCE(SUM(amount_paise) FILTER (WHERE type = 'expense'), 0) AS expense_paise,
-              COALESCE(SUM(amount_paise) FILTER (WHERE type = 'income'), 0) AS income_paise
+    // Category breakdown for current month
+    const currentMonth = new Date().toISOString().slice(0, 7) + '-01';
+    const { rows: categoryData } = await query<{
+      category: string;
+      total: string;
+      count: string;
+    }>(
+      `SELECT category, COALESCE(SUM(amount_paise), 0) AS total, COUNT(*) AS count
        FROM transactions
-       WHERE user_id = $1 AND transaction_date >= CURRENT_DATE - INTERVAL '7 days'
-       GROUP BY transaction_date::date ORDER BY day ASC`,
+       WHERE user_id = $1 AND type = 'expense'
+         AND transaction_date >= $2 
+         AND transaction_date < ($2::date + INTERVAL '1 month')::date
+       GROUP BY category
+       ORDER BY total DESC`,
+      [userId, currentMonth]
+    );
+
+    // Top spending categories (all time)
+    const { rows: topCategories } = await query<{
+      category: string;
+      total: string;
+      count: string;
+    }>(
+      `SELECT category, COALESCE(SUM(amount_paise), 0) AS total, COUNT(*) AS count
+       FROM transactions
+       WHERE user_id = $1 AND type = 'expense'
+       GROUP BY category
+       ORDER BY total DESC
+       LIMIT 5`,
       [userId]
     );
 
-    return rows.map(r => ({
-      day: r.day,
-      expensePaise: Number(r.expense_paise),
-      incomePaise: Number(r.income_paise),
-    }));
-  }
-
-  /** Cash vs Bank vs UPI usage comparison */
-  async paymentMethodUsage(userId: string, startDate?: string, endDate?: string) {
-    let whereClause = "WHERE t.user_id = $1 AND t.type = 'expense'";
-    const params: any[] = [userId];
-    let idx = 2;
-
-    if (startDate) { whereClause += ` AND t.transaction_date >= $${idx++}`; params.push(startDate); }
-    if (endDate) { whereClause += ` AND t.transaction_date <= $${idx++}`; params.push(endDate); }
-
-    const { rows } = await query(
-      `SELECT a.type AS account_type, SUM(t.amount_paise) AS total_paise, COUNT(*) AS count
-       FROM transactions t JOIN accounts a ON t.account_id = a.id
-       ${whereClause}
-       GROUP BY a.type ORDER BY total_paise DESC`,
-      params
+    // Daily spending for current month
+    const { rows: dailySpending } = await query<{
+      day: string;
+      total: string;
+    }>(
+      `SELECT transaction_date AS day, COALESCE(SUM(amount_paise), 0) AS total
+       FROM transactions
+       WHERE user_id = $1 AND type = 'expense'
+         AND transaction_date >= $2 
+         AND transaction_date < ($2::date + INTERVAL '1 month')::date
+       GROUP BY transaction_date
+       ORDER BY transaction_date ASC`,
+      [userId, currentMonth]
     );
 
-    return rows.map(r => ({
-      accountType: r.account_type,
-      totalPaise: Number(r.total_paise),
-      count: Number(r.count),
+    // Build monthly trend array
+    const monthlyTrend = new Map<string, { income: number; expense: number; savings: number }>();
+    for (const row of monthlyData) {
+      const key = String(row.month);
+      if (!monthlyTrend.has(key)) {
+        monthlyTrend.set(key, { income: 0, expense: 0, savings: 0 });
+      }
+      const entry = monthlyTrend.get(key)!;
+      if (row.type === 'income') entry.income = Number(row.total);
+      if (row.type === 'expense') entry.expense = Number(row.total);
+      entry.savings = entry.income - entry.expense;
+    }
+
+    // Total expense for percentage calculations
+    const totalExpense = categoryData.reduce((sum, r) => sum + Number(r.total), 0);
+
+    return {
+      monthlyTrend: Array.from(monthlyTrend.entries()).map(([month, data]) => ({
+        month,
+        ...data,
+      })),
+      categoryBreakdown: categoryData.map((r) => ({
+        category: r.category,
+        amountPaise: Number(r.total),
+        transactionCount: Number(r.count),
+        percentage: totalExpense > 0 ? Math.round((Number(r.total) / totalExpense) * 100) : 0,
+      })),
+      topCategories: topCategories.map((r) => ({
+        category: r.category,
+        totalPaise: Number(r.total),
+        count: Number(r.count),
+      })),
+      dailySpending: dailySpending.map((r) => ({
+        date: r.day,
+        amountPaise: Number(r.total),
+      })),
+    };
+  }
+
+  async getCategoryAnalytics(userId: string, monthStr?: string) {
+    const targetMonth = monthStr ? `${monthStr}-01` : new Date().toISOString().slice(0, 7) + '-01';
+    const { rows: categoryData } = await query<{
+      category: string;
+      total: string;
+      count: string;
+    }>(
+      `SELECT category, COALESCE(SUM(amount_paise), 0) AS total, COUNT(*) AS count
+       FROM transactions
+       WHERE user_id = $1 AND type = 'expense'
+         AND transaction_date >= $2 
+         AND transaction_date < ($2::date + INTERVAL '1 month')::date
+       GROUP BY category
+       ORDER BY total DESC`,
+      [userId, targetMonth]
+    );
+
+    const totalExpense = categoryData.reduce((sum, r) => sum + Number(r.total), 0);
+
+    return categoryData.map((r) => ({
+      category: r.category,
+      amountPaise: Number(r.total),
+      transactionCount: Number(r.count),
+      percentage: totalExpense > 0 ? Math.round((Number(r.total) / totalExpense) * 100) : 0,
     }));
   }
 
-  /** Last 6 months comparison */
-  async sixMonthComparison(userId: string) {
-    return this.monthlyGraph(userId, 6);
+  async getMonthlyAnalytics(userId: string, months: number = 6) {
+    const { rows: monthlyData } = await query<{
+      month: string;
+      type: string;
+      total: string;
+      count: string;
+    }>(
+      `SELECT 
+         DATE_TRUNC('month', transaction_date)::date AS month,
+         type,
+         COALESCE(SUM(amount_paise), 0) AS total,
+         COUNT(*) AS count
+       FROM transactions
+       WHERE user_id = $1 
+         AND transaction_date >= (CURRENT_DATE - ($2 * INTERVAL '1 month'))::date
+       GROUP BY month, type
+       ORDER BY month ASC`,
+      [userId, months]
+    );
+
+    const monthlyTrend = new Map<string, { income: number; expense: number; savings: number }>();
+    for (const row of monthlyData) {
+      const key = String(row.month);
+      if (!monthlyTrend.has(key)) {
+        monthlyTrend.set(key, { income: 0, expense: 0, savings: 0 });
+      }
+      const entry = monthlyTrend.get(key)!;
+      if (row.type === 'income') entry.income = Number(row.total);
+      if (row.type === 'expense') entry.expense = Number(row.total);
+      entry.savings = entry.income - entry.expense;
+    }
+
+    return Array.from(monthlyTrend.entries()).map(([month, data]) => ({
+      month,
+      ...data,
+    }));
   }
 
-  /** Spending trend percentage — current vs previous period */
-  async spendingTrend(userId: string) {
-    const now = new Date();
-    const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
-    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+  async getWeeklyAnalytics(userId: string, monthStr?: string) {
+    const targetMonth = monthStr ? `${monthStr}-01` : new Date().toISOString().slice(0, 7) + '-01';
+    const { rows: weeklyData } = await query<{
+      week: string;
+      total: string;
+    }>(
+      `SELECT 
+         DATE_TRUNC('week', transaction_date)::date AS week,
+         COALESCE(SUM(amount_paise), 0) AS total
+       FROM transactions
+       WHERE user_id = $1 AND type = 'expense'
+         AND transaction_date >= $2 
+         AND transaction_date < ($2::date + INTERVAL '1 month')::date
+       GROUP BY week
+       ORDER BY week ASC`,
+      [userId, targetMonth]
+    );
 
-    const currentExpense = await this.totalExpense(userId, currentMonthStart);
-    const prevExpense = await this.totalExpense(userId, prevMonthStart, prevMonthEnd);
-
-    return {
-      currentMonthExpensePaise: currentExpense,
-      previousMonthExpensePaise: prevExpense,
-      changePercent: percentageChange(currentExpense, prevExpense),
-      trend: currentExpense > prevExpense ? 'increasing' : currentExpense < prevExpense ? 'decreasing' : 'stable',
-    };
+    return weeklyData.map((r) => ({
+      week: r.week,
+      expense: Number(r.total),
+    }));
   }
 }
 

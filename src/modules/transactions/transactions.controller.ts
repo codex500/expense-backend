@@ -1,51 +1,46 @@
-/**
- * Transactions controller
- */
-
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { transactionsService } from './transactions.service';
 import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/response';
 import { AuthenticatedRequest } from '../../shared/types';
 
 export class TransactionsController {
-  async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async list(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await transactionsService.create(req.user.id, req.body);
-      sendCreated(res, result, 'Transaction created.');
-    } catch (err) { next(err); }
-  }
-
-  async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await transactionsService.update(req.user.id, req.params.id as string, req.body);
-      sendSuccess(res, result, 'Transaction updated.');
-    } catch (err) { next(err); }
-  }
-
-  async delete(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await transactionsService.delete(req.user.id, req.params.id as string);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async getById(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await transactionsService.getById(req.user.id, req.params.id as string);
-      sendSuccess(res, result);
-    } catch (err) { next(err); }
-  }
-
-  async list(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-    try {
-      const result = await transactionsService.list(req.user.id, req.query as any);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await transactionsService.list(authReq.user.id, req.query as any);
       sendPaginated(res, result.transactions, result.meta);
     } catch (err) { next(err); }
   }
 
-  async exportPdf(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  async getById(req: Request, res: Response, next: NextFunction) {
     try {
-      await transactionsService.exportPdf(req.user.id, res);
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await transactionsService.getById(authReq.user.id, req.params.id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async create(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await transactionsService.create(authReq.user.id, req.body);
+      sendCreated(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await transactionsService.update(authReq.user.id, req.params.id, req.body);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await transactionsService.delete(authReq.user.id, req.params.id);
+      sendSuccess(res, result);
     } catch (err) { next(err); }
   }
 }

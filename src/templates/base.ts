@@ -1,8 +1,8 @@
 /**
- * Email templates builder
+ * Email base template — responsive HTML email layout.
  */
 
-export const getBaseTemplate = (title: string, content: string, ctaLink?: string, ctaText?: string) => `
+export const getBaseTemplate = (title: string, content: string, ctaLink?: string, ctaText?: string): string => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -16,7 +16,7 @@ export const getBaseTemplate = (title: string, content: string, ctaLink?: string
       <td align="center">
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width: 600px; background-color: #1e293b; border: 1px solid #334155; border-radius: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); overflow: hidden;">
           
-          <!-- Header with gradient -->
+          <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%); padding: 40px 30px; text-align: center;">
               <h1 style="margin: 0; color: #ffffff; font-size: 36px; font-weight: 800; letter-spacing: -1px;">Trackify</h1>
@@ -30,7 +30,6 @@ export const getBaseTemplate = (title: string, content: string, ctaLink?: string
               ${content}
               
               ${ctaLink ? `
-              <!-- CTA Button -->
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr>
                   <td align="center" style="padding: 40px 0 10px;">
@@ -49,7 +48,7 @@ export const getBaseTemplate = (title: string, content: string, ctaLink?: string
           <tr>
             <td style="padding: 30px; background-color: #0f172a; border-top: 1px solid #334155; text-align: center;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px;">
-                © ${new Date().getFullYear()} All copyrights are reserved by PixoraLabz.tech
+                &copy; ${new Date().getFullYear()} All copyrights are reserved by PixoraLabz.tech
               </p>
             </td>
           </tr>
