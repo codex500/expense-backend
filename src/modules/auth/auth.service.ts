@@ -315,7 +315,7 @@ export class AuthService {
    * Get current session / user info.
    */
   async getSession(userId: string) {
-    const { rows } = await query<Record<string, unknown>>(
+    let { rows } = await query<Record<string, unknown>>(
       `SELECT up.*,
               (SELECT COUNT(*) FROM accounts WHERE user_id = up.id AND is_active = true) AS account_count
        FROM user_profiles up WHERE up.id = $1`,
@@ -323,7 +323,22 @@ export class AuthService {
     );
 
     if (rows.length === 0) {
-      throw new NotFoundError('User profile not found.');
+      const { data: { user }, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (error || !user) throw new NotFoundError('User profile not found.');
+      
+      await query(
+        `INSERT INTO user_profiles (id, email, full_name) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+        [user.id, user.email, user.user_metadata?.full_name || 'User']
+      );
+
+      const { rows: newRows } = await query<Record<string, unknown>>(
+        `SELECT up.*,
+                (SELECT COUNT(*) FROM accounts WHERE user_id = up.id AND is_active = true) AS account_count
+         FROM user_profiles up WHERE up.id = $1`,
+        [userId]
+      );
+      rows = newRows;
+      if (rows.length === 0) throw new NotFoundError('User profile not found.');
     }
 
     const profile = rows[0];

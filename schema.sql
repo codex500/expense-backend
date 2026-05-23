@@ -1,4 +1,12 @@
-CREATE TABLE IF NOT EXISTS public.user_profiles (
+DROP TABLE IF EXISTS public.user_passkeys CASCADE;
+DROP TABLE IF EXISTS public.budgets CASCADE;
+DROP TABLE IF EXISTS public.transactions CASCADE;
+DROP TABLE IF EXISTS public.categories CASCADE;
+DROP TABLE IF EXISTS public.accounts CASCADE;
+DROP TABLE IF EXISTS public.notifications CASCADE;
+DROP TABLE IF EXISTS public.user_profiles CASCADE;
+
+CREATE TABLE public.user_profiles (
   id UUID PRIMARY KEY,
   email TEXT NOT NULL,
   full_name TEXT NOT NULL,
@@ -18,9 +26,9 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.accounts (
+CREATE TABLE public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   account_name TEXT NOT NULL,
   bank_name TEXT,
   type TEXT NOT NULL,
@@ -33,19 +41,21 @@ CREATE TABLE IF NOT EXISTS public.accounts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.categories (
+CREATE TABLE public.categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL,
   icon TEXT,
   color TEXT,
+  is_system BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.transactions (
+CREATE TABLE public.transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   account_id UUID REFERENCES public.accounts(id) ON DELETE CASCADE,
   transfer_to_account_id UUID REFERENCES public.accounts(id) ON DELETE SET NULL,
   type TEXT NOT NULL,
@@ -62,9 +72,9 @@ CREATE TABLE IF NOT EXISTS public.transactions (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.budgets (
+CREATE TABLE public.budgets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   scope TEXT NOT NULL,
   category TEXT,
   account_id UUID,
@@ -77,17 +87,29 @@ CREATE TABLE IF NOT EXISTS public.budgets (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS budgets_unique_idx ON public.budgets(user_id, scope, COALESCE(category, ''), COALESCE(account_id, '00000000-0000-0000-0000-000000000000'::uuid), month);
+CREATE UNIQUE INDEX budgets_unique_idx ON public.budgets(user_id, scope, COALESCE(category, ''), COALESCE(account_id, '00000000-0000-0000-0000-000000000000'::uuid), month);
 
-CREATE TABLE IF NOT EXISTS public.user_passkeys (
+CREATE TABLE public.user_passkeys (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
   credential_id TEXT UNIQUE NOT NULL,
   public_key BYTEA NOT NULL,
   counter BIGINT NOT NULL DEFAULT 0,
   device_type TEXT NOT NULL,
   backed_up BOOLEAN NOT NULL DEFAULT false,
   transports TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.user_profiles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  data JSONB,
+  is_read BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
