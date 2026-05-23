@@ -362,6 +362,12 @@ export class AuthService {
 
     const profile = rows[0];
 
+    let decryptedPan = null;
+    if (profile.pan_card) {
+      const { decrypt } = require('../../shared/utils/crypto');
+      decryptedPan = decrypt(profile.pan_card);
+    }
+
     return {
       id: profile.id,
       email: profile.email,
@@ -369,6 +375,7 @@ export class AuthService {
       dob: profile.dob,
       gender: profile.gender,
       phone: profile.phone_number ?? null,
+      pan: decryptedPan,
       avatarUrl: profile.avatar_url,
       defaultCurrency: profile.default_currency,
       themePreference: profile.theme_preference,
@@ -408,6 +415,15 @@ export class AuthService {
     if (updates.gender !== undefined) {
       setClauses.push(`gender = $${idx++}`);
       params.push(updates.gender);
+    }
+    if (updates.panCard !== undefined) {
+      setClauses.push(`pan_card = $${idx++}`);
+      if (updates.panCard) {
+        const { encrypt } = require('../../shared/utils/crypto');
+        params.push(encrypt(updates.panCard));
+      } else {
+        params.push(null);
+      }
     }
     if (updates.themePreference !== undefined) {
       setClauses.push(`theme_preference = $${idx++}`);
