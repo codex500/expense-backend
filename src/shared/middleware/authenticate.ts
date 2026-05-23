@@ -19,24 +19,25 @@ async function verifyToken(req: Request): Promise<AuthUser> {
     throw new UnauthorizedError('No token provided.');
   }
 
-  let userId: string;
+  let userId: string = '';
   let jwtEmail = '';
   let jwtName = '';
 
   const jwtSecret = process.env.JWT_SECRET;
   if (jwtSecret) {
     const jwt = require('jsonwebtoken');
-    let decodedUser: any;
     try {
-      decodedUser = jwt.verify(token, jwtSecret);
+      const decodedUser = jwt.verify(token, jwtSecret);
+      userId = decodedUser.sub;
+      jwtEmail = decodedUser.email || '';
+      jwtName = decodedUser.user_metadata?.full_name || '';
     } catch (err) {
-      throw new UnauthorizedError('Invalid or expired token.');
+      // Local verification failed (maybe wrong JWT_SECRET). We will fallback to Supabase API below.
     }
-    userId = decodedUser.sub;
-    jwtEmail = decodedUser.email || '';
-    jwtName = decodedUser.user_metadata?.full_name || '';
-  } else {
-    // Fallback to calling Supabase API if JWT_SECRET is not configured locally/on server
+  }
+
+  if (!userId) {
+    // Fallback to calling Supabase API directly to validate the token
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
       throw new UnauthorizedError('Invalid or expired token.');
