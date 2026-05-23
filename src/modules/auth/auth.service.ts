@@ -75,20 +75,14 @@ export class AuthService {
       );
     }
 
-    // Send verification email via Supabase
-    // Supabase auto-sends confirmation email if email_confirm is false
-    // But we can also trigger it explicitly for custom redirect:
+    // Trigger Supabase to send the OTP confirmation email
     try {
-      await supabaseAdmin.auth.admin.generateLink({
+      await supabaseAdmin.auth.resend({
         type: 'signup',
         email: input.email,
-        password: input.password,
-        options: {
-          redirectTo: `${env.APP_URL}auth/callback`,
-        },
       });
     } catch (err) {
-      console.warn('[Auth] Failed to generate signup link:', err);
+      console.warn('[Auth] Failed to send OTP email:', err);
     }
 
     // Also send welcome email via Resend
