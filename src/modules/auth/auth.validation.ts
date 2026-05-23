@@ -14,9 +14,9 @@ export const signupSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number')
     .regex(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/, 'Password must contain at least one special character'),
   fullName: z.string().min(2, 'Name must be at least 2 characters').max(255),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of Birth must be in YYYY-MM-DD format').optional(),
-  gender: z.string().max(20).optional(),
-  mobileNumber: z.string().max(20).optional(),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of Birth must be in YYYY-MM-DD format').optional().or(z.literal('')),
+  gender: z.string().max(20).optional().or(z.literal('')),
+  mobileNumber: z.string().max(20).optional().or(z.literal('')),
 });
 
 export const loginSchema = z.object({
@@ -55,10 +55,10 @@ export const onboardingSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  fullName: z.string().min(2).max(255).optional(),
-  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  mobileNumber: z.string().max(20).optional(),
-  gender: z.string().max(20).optional(),
+  fullName: z.string().min(2).max(255).optional().or(z.literal('')),
+  dob: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
+  mobileNumber: z.string().max(20).optional().or(z.literal('')),
+  gender: z.string().max(20).optional().or(z.literal('')),
   themePreference: z.enum(['light', 'dark', 'system']).optional(),
   notifyEmail: z.boolean().optional(),
   notifyPush: z.boolean().optional(),
