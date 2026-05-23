@@ -15,6 +15,8 @@ import {
   refreshSchema,
   onboardingSchema,
   updateProfileSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 } from './auth.validation';
 
 const router = Router();
@@ -24,6 +26,18 @@ router.post('/signup',
   authLimiter,
   validate({ body: signupSchema }),
   (req, res, next) => authController.signup(req, res, next)
+);
+
+router.post('/verify-email',
+  authLimiter,
+  validate({ body: verifyEmailSchema }),
+  (req, res, next) => authController.verifyEmail(req, res, next)
+);
+
+router.post('/resend-verification',
+  authLimiter,
+  validate({ body: resendVerificationSchema }),
+  (req, res, next) => authController.resendVerification(req, res, next)
 );
 
 router.post('/login',

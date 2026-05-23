@@ -109,6 +109,47 @@ export class AuthService {
   }
 
   /**
+   * Verify Email using 6-digit OTP code.
+   */
+  async verifyEmail(email: string, token: string) {
+    const { data, error } = await supabaseAdmin.auth.verifyOtp({
+      email,
+      token,
+      type: 'signup',
+    });
+
+    if (error || !data.session) {
+      throw new UnauthorizedError('Invalid or expired verification code.');
+    }
+
+    return {
+      message: 'Email verified successfully.',
+      session: {
+        accessToken: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+        expiresIn: data.session.expires_in,
+      },
+    };
+  }
+
+  /**
+   * Resend Verification Code.
+   */
+  async resendVerification(email: string) {
+    const { error } = await supabaseAdmin.auth.resend({
+      type: 'signup',
+      email,
+    });
+
+    if (error) {
+      throw new BadRequestError('Failed to resend verification code. ' + error.message);
+    }
+
+    return { message: 'Verification code resent successfully.' };
+  }
+
+  /**
    * Login with email + password via Supabase.
    * Returns the Supabase-generated JWT tokens.
    */

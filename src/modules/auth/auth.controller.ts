@@ -24,6 +24,22 @@ export class AuthController {
     } catch (err) { next(err); }
   }
 
+  async verifyEmail(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, token } = req.body;
+      const result = await authService.verifyEmail(email, token);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async resendVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email } = req.body;
+      const result = await authService.resendVerification(email);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
   async refresh(req: Request, res: Response, next: NextFunction) {
     try {
       const { refreshToken } = req.body;
