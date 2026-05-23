@@ -2,8 +2,8 @@ import crypto from 'crypto';
 import { env } from '../../config/env';
 
 // We need a 32-byte key for AES-256-CBC.
-// If JWT_SECRET is not 32 bytes, we'll hash it to get exactly 32 bytes.
-const ENCRYPTION_KEY = crypto.createHash('sha256').update(env.JWT_SECRET).digest();
+// If the key is not 32 bytes, we'll hash it to get exactly 32 bytes.
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(env.SUPABASE_SERVICE_ROLE_KEY).digest();
 const IV_LENGTH = 16; // For AES, this is always 16
 
 export function encrypt(text: string): string {
