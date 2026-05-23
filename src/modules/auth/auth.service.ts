@@ -23,22 +23,27 @@ export class AuthService {
    * The DB trigger `handle_new_user` auto-creates the profile row.
    */
   async signup(input: SignupInput) {
-    // Create user in Supabase Auth
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Create user in Supabase Auth (Using public API natively triggers the OTP email)
+    const { data, error } = await supabasePublic.auth.signUp({
       email: input.email,
       password: input.password,
-      email_confirm: false,
-      user_metadata: {
-        full_name: input.fullName,
-        dob: input.dob,
+      options: {
+        data: {
+          full_name: input.fullName,
+          dob: input.dob,
+        },
       },
     });
 
     if (error) {
-      if (error.message.includes('already been registered') || error.message.includes('already exists')) {
+      if (error.message.includes('already been registered') || error.message.includes('already exists') || error.status === 422) {
         throw new ConflictError('An account with this email already exists.');
       }
       throw new BadRequestError(error.message);
+    }
+
+    if (!data.user) {
+      throw new BadRequestError('Signup failed. Please try again.');
     }
 
     const user = data.user;
@@ -73,16 +78,6 @@ export class AuthService {
         `UPDATE user_profiles SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx}`,
         params
       );
-    }
-
-    // Trigger Supabase to send the OTP confirmation email
-    try {
-      await supabaseAdmin.auth.resend({
-        type: 'signup',
-        email: input.email,
-      });
-    } catch (err) {
-      console.warn('[Auth] Failed to send OTP email:', err);
     }
 
     // Also send welcome email via Resend
