@@ -43,37 +43,21 @@ export class AuthService {
 
     const user = data.user;
 
-    // Update profile with additional fields (trigger creates basic row)
-    const updates: string[] = [];
-    const params: unknown[] = [];
-    let idx = 1;
-
-    if (input.fullName) {
-      updates.push(`full_name = $${idx++}`);
-      params.push(input.fullName);
-    }
-    if (input.dob) {
-      updates.push(`dob = $${idx++}`);
-      params.push(input.dob);
-    }
-    if (input.gender) {
-      updates.push(`gender = $${idx++}`);
-      params.push(input.gender);
-    }
-    if (input.mobileNumber) {
-      let phone = input.mobileNumber;
-      if (phone && !phone.startsWith('+')) phone = '+91' + phone;
-      updates.push(`phone_number = $${idx++}`);
-      params.push(phone);
-    }
-
-    if (updates.length > 0) {
-      params.push(user.id);
-      await query(
-        `UPDATE user_profiles SET ${updates.join(', ')}, updated_at = NOW() WHERE id = $${idx}`,
-        params
-      );
-    }
+    // Upsert profile with additional fields (handles race condition with Supabase trigger)
+    let phone = input.mobileNumber;
+    if (phone && !phone.startsWith('+')) phone = '+91' + phone;
+    
+    await query(
+      `INSERT INTO user_profiles (id, email, full_name, dob, gender, phone_number, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         full_name = EXCLUDED.full_name,
+         dob = COALESCE(EXCLUDED.dob, user_profiles.dob),
+         gender = COALESCE(EXCLUDED.gender, user_profiles.gender),
+         phone_number = COALESCE(EXCLUDED.phone_number, user_profiles.phone_number),
+         updated_at = EXCLUDED.updated_at`,
+      [user.id, user.email, input.fullName, input.dob || null, input.gender || null, phone || null]
+    );
 
     // Trigger Supabase to send the OTP confirmation email
     try {
