@@ -19,15 +19,33 @@ async function verifyToken(req: Request): Promise<AuthUser> {
     throw new UnauthorizedError('No token provided.');
   }
 
-  const jwt = require('jsonwebtoken');
-  let decodedUser: any;
-  try {
-    decodedUser = jwt.verify(token, process.env.JWT_SECRET || '');
-  } catch (err) {
-    throw new UnauthorizedError('Invalid or expired token.');
+  let userId: string;
+  let jwtEmail = '';
+  let jwtName = '';
+
+  const jwtSecret = process.env.JWT_SECRET;
+  if (jwtSecret) {
+    const jwt = require('jsonwebtoken');
+    let decodedUser: any;
+    try {
+      decodedUser = jwt.verify(token, jwtSecret);
+    } catch (err) {
+      throw new UnauthorizedError('Invalid or expired token.');
+    }
+    userId = decodedUser.sub;
+    jwtEmail = decodedUser.email || '';
+    jwtName = decodedUser.user_metadata?.full_name || '';
+  } else {
+    // Fallback to calling Supabase API if JWT_SECRET is not configured locally/on server
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      throw new UnauthorizedError('Invalid or expired token.');
+    }
+    userId = user.id;
+    jwtEmail = user.email || '';
+    jwtName = user.user_metadata?.full_name || '';
   }
 
-  const userId = decodedUser.sub;
   if (!userId) {
     throw new UnauthorizedError('Invalid token payload.');
   }
@@ -44,8 +62,8 @@ async function verifyToken(req: Request): Promise<AuthUser> {
   if (rows.length === 0) {
     return {
       id: userId,
-      email: decodedUser.email || '',
-      name: decodedUser.user_metadata?.full_name || '',
+      email: jwtEmail,
+      name: jwtName,
       emailVerified: true, // If they have a valid token, assume verified
     };
   }
