@@ -22,6 +22,7 @@ CREATE TABLE public.user_profiles (
   notify_email BOOLEAN DEFAULT true,
   notify_push BOOLEAN DEFAULT true,
   notify_budget BOOLEAN DEFAULT true,
+  pan_card TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
