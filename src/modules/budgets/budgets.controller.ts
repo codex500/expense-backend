@@ -13,6 +13,14 @@ export class BudgetsController {
     } catch (err) { next(err); }
   }
 
+  async getById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await budgetsService.getById(authReq.user.id, req.params.id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
   async upsert(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;

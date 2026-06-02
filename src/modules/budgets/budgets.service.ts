@@ -49,6 +49,45 @@ export class BudgetsService {
     });
   }
 
+  async getById(userId: string, budgetId: string) {
+    const { rows } = await query(
+      `SELECT b.*,
+              COALESCE(
+                (SELECT SUM(t.amount_paise) FROM transactions t
+                 WHERE t.user_id = b.user_id AND t.type = 'expense'
+                 AND t.transaction_date >= b.month
+                 AND t.transaction_date < (b.month + INTERVAL '1 month')::date
+                 AND (b.scope = 'overall' OR
+                      (b.scope = 'category' AND t.category = b.category) OR
+                      (b.scope = 'account' AND t.account_id = b.account_id))
+                ), 0
+              ) AS spent_paise
+       FROM budgets b
+       WHERE b.user_id = $1 AND b.id = $2`,
+      [userId, budgetId]
+    );
+
+    if (rows.length === 0) throw new NotFoundError('Budget not found.');
+
+    const row = rows[0];
+    const spent = Number(row.spent_paise);
+    const budget = Number(row.amount_paise);
+    return {
+      id: row.id,
+      userId: row.user_id,
+      scope: row.scope,
+      category: row.category,
+      accountId: row.account_id,
+      amountPaise: budget,
+      spentPaise: spent,
+      remainingPaise: Math.max(0, budget - spent),
+      percentUsed: percentageUsed(spent, budget),
+      month: row.month,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
   async upsert(userId: string, input: CreateBudgetInput) {
     // Use ON CONFLICT to upsert
     const { rows: [budget] } = await query(
