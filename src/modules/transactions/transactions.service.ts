@@ -70,7 +70,7 @@ export class TransactionsService {
         [
           userId, input.accountId, input.type, input.category, input.amountPaise,
           input.note || null, input.transactionDate, input.paymentMethod || null,
-          input.tags || null, input.receiptUrl || null,
+          input.tags ? JSON.stringify(input.tags) : null, input.receiptUrl || null,
           input.isRecurring, input.recurringInterval || null,
           input.transferToAccountId || null,
         ]
@@ -206,7 +206,7 @@ export class TransactionsService {
       const fieldMap: Record<string, string> = {
         accountId: 'account_id', type: 'type', category: 'category',
         amountPaise: 'amount_paise', note: 'note', transactionDate: 'transaction_date',
-        paymentMethod: 'payment_method', tags: 'tags', receiptUrl: 'receipt_url',
+        paymentMethod: 'payment_method', receiptUrl: 'receipt_url',
         isRecurring: 'is_recurring', recurringInterval: 'recurring_interval',
       };
 
@@ -215,6 +215,11 @@ export class TransactionsService {
           sets.push(`${col} = $${i++}`);
           params.push((input as Record<string, unknown>)[key]);
         }
+      }
+
+      if (input.tags !== undefined) {
+        sets.push(`tags = $${i++}`);
+        params.push(input.tags ? JSON.stringify(input.tags) : null);
       }
 
       if (sets.length > 0) {
