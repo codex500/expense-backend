@@ -9,3 +9,11 @@ export const createBudgetSchema = z.object({
 });
 
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
+
+export const updateBudgetSchema = z.object({
+  category: z.string().max(100).optional(),
+  amountPaise: z.number().int().positive('Budget amount must be positive').optional(),
+  month: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Month must be YYYY-MM-DD (first day of month)').optional(),
+});
+
+export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;

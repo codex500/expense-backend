@@ -5,7 +5,7 @@
 import { query } from '../../config/database';
 import { NotFoundError } from '../../shared/errors';
 import { percentageUsed } from '../../shared/utils/money';
-import { CreateBudgetInput } from './budgets.validation';
+import { CreateBudgetInput, UpdateBudgetInput } from './budgets.validation';
 
 export class BudgetsService {
 
@@ -107,6 +107,34 @@ export class BudgetsService {
       amountPaise: Number(budget.amount_paise),
       month: budget.month,
       message: 'Budget saved.',
+    };
+  }
+
+  async update(userId: string, budgetId: string, input: UpdateBudgetInput) {
+    const { rows } = await query(
+      `UPDATE budgets 
+       SET category = COALESCE($3, category),
+           amount_paise = COALESCE($4, amount_paise),
+           month = COALESCE($5, month),
+           alert_80_sent = CASE WHEN $4 IS NOT NULL THEN false ELSE alert_80_sent END,
+           alert_90_sent = CASE WHEN $4 IS NOT NULL THEN false ELSE alert_90_sent END,
+           alert_100_sent = CASE WHEN $4 IS NOT NULL THEN false ELSE alert_100_sent END
+       WHERE id = $1 AND user_id = $2
+       RETURNING *`,
+      [budgetId, userId, input.category || null, input.amountPaise || null, input.month || null]
+    );
+
+    if (rows.length === 0) throw new NotFoundError('Budget not found.');
+
+    const budget = rows[0];
+    return {
+      id: budget.id,
+      scope: budget.scope,
+      category: budget.category,
+      accountId: budget.account_id,
+      amountPaise: Number(budget.amount_paise),
+      month: budget.month,
+      message: 'Budget updated.',
     };
   }
 

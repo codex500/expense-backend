@@ -29,6 +29,14 @@ export class BudgetsController {
     } catch (err) { next(err); }
   }
 
+  async update(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await budgetsService.update(authReq.user.id, req.params.id, req.body);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       const authReq = req as unknown as AuthenticatedRequest;
