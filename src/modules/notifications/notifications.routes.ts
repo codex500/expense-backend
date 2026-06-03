@@ -8,6 +8,8 @@ router.use(authenticate as any);
 router.get('/', (req, res, next) => notificationsController.list(req, res, next));
 router.get('/unread-count', (req, res, next) => notificationsController.getUnreadCount(req, res, next));
 router.put('/:id/read', (req, res, next) => notificationsController.markAsRead(req, res, next));
+router.put('/:id/unread', (req, res, next) => notificationsController.markAsUnread(req, res, next));
 router.put('/read-all', (req, res, next) => notificationsController.markAllAsRead(req, res, next));
+router.delete('/:id', (req, res, next) => notificationsController.delete(req, res, next));
 
 export default router;

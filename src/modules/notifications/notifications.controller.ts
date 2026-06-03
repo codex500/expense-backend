@@ -36,6 +36,22 @@ export class NotificationsController {
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
+
+  async markAsUnread(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await notificationsService.markAsUnread(authReq.user.id, req.params.id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const result = await notificationsService.delete(authReq.user.id, req.params.id);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
 }
 
 export const notificationsController = new NotificationsController();

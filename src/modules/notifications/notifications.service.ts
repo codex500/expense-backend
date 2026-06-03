@@ -62,6 +62,22 @@ export class NotificationsService {
       createdAt: row.created_at,
     };
   }
+
+  async markAsUnread(userId: string, notifId: string) {
+    await query(
+      'UPDATE notifications SET is_read = false WHERE id = $1 AND user_id = $2',
+      [notifId, userId]
+    );
+    return { message: 'Notification marked as unread.' };
+  }
+
+  async delete(userId: string, notifId: string) {
+    await query(
+      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+      [notifId, userId]
+    );
+    return { message: 'Notification deleted.' };
+  }
 }
 
 export const notificationsService = new NotificationsService();
