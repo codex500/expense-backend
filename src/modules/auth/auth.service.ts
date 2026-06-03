@@ -441,6 +441,10 @@ export class AuthService {
       setClauses.push(`notify_budget = $${idx++}`);
       params.push(updates.notifyBudget);
     }
+    if ((updates as any).avatarUrl !== undefined) {
+      setClauses.push(`avatar_url = $${idx++}`);
+      params.push((updates as any).avatarUrl || null);
+    }
 
     if (setClauses.length === 0) {
       throw new BadRequestError('No valid fields to update.');

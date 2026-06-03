@@ -69,6 +69,7 @@ export const updateProfileSchema = z.object({
   mobileNumber: z.string().max(20).optional().or(z.literal('')),
   gender: z.string().max(20).optional().or(z.literal('')),
   panCard: z.string().max(20).optional().or(z.literal('')),
+  avatarUrl: z.string().url().optional().or(z.literal('')),
   themePreference: z.enum(['light', 'dark', 'system']).optional(),
   notifyEmail: z.boolean().optional(),
   notifyPush: z.boolean().optional(),
@@ -78,4 +79,4 @@ export const updateProfileSchema = z.object({
 export type SignupInput = z.infer<typeof signupSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema> & { avatarUrl?: string };
