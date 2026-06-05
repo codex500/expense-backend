@@ -521,6 +521,37 @@ export class AuthService {
 
     return { message: 'Account and all associated data successfully deleted.' };
   }
+
+  /**
+   * Register a push notification device token.
+   */
+  async registerDeviceToken(userId: string, token: string, deviceType: string) {
+    await query(
+      `INSERT INTO device_tokens (user_id, token, device_type, is_active, updated_at)
+       VALUES ($1, $2, $3, true, NOW())
+       ON CONFLICT (user_id, token) DO UPDATE SET
+         is_active = true,
+         device_type = EXCLUDED.device_type,
+         updated_at = NOW()`,
+      [userId, token, deviceType]
+    );
+
+    return { message: 'Device token registered successfully.' };
+  }
+
+  /**
+   * Remove/deactivate a push notification device token.
+   */
+  async removeDeviceToken(userId: string, token: string) {
+    await query(
+      `UPDATE device_tokens 
+       SET is_active = false, updated_at = NOW() 
+       WHERE user_id = $1 AND token = $2`,
+      [userId, token]
+    );
+
+    return { message: 'Device token removed successfully.' };
+  }
 }
 
 export const authService = new AuthService();

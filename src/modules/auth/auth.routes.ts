@@ -95,6 +95,21 @@ router.delete('/account',
   (req, res, next) => authController.deleteAccount(req, res, next)
 );
 
+// ─── Device Token Routes ───────────────────────────────
+import { registerDeviceTokenSchema, removeDeviceTokenSchema } from './auth.validation';
+
+router.post('/device-token',
+  authenticate as any,
+  validate({ body: registerDeviceTokenSchema }),
+  (req, res, next) => authController.registerDeviceToken(req, res, next)
+);
+
+router.delete('/device-token',
+  authenticate as any,
+  validate({ body: removeDeviceTokenSchema }),
+  (req, res, next) => authController.removeDeviceToken(req, res, next)
+);
+
 // ─── Passkey Routes ──────────────────────────────────────
 router.get('/passkey/register/options',
   authenticate as any,

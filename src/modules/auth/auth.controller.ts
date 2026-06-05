@@ -112,6 +112,24 @@ export class AuthController {
     } catch (err) { next(err); }
   }
 
+  async registerDeviceToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const { token, deviceType } = req.body;
+      const result = await authService.registerDeviceToken(authReq.user.id, token, deviceType);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
+  async removeDeviceToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const { token } = req.body;
+      const result = await authService.removeDeviceToken(authReq.user.id, token);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
+
   // --- Passkey Methods ---
   async generateRegistrationOptions(req: Request, res: Response, next: NextFunction) {
     try {
