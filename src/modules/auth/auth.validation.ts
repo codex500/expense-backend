@@ -74,6 +74,7 @@ export const updateProfileSchema = z.object({
   notifyEmail: z.boolean().optional(),
   notifyPush: z.boolean().optional(),
   notifyBudget: z.boolean().optional(),
+  pushToken: z.string().optional(),
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;

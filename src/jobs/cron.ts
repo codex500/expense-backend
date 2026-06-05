@@ -5,8 +5,10 @@
 import cron from 'node-cron';
 import { query } from '../config/database';
 import { emailService } from '../services/emailService';
+import { pushService } from '../services/pushService';
 import { notificationsService } from '../modules/notifications/notifications.service';
 import { budgetsService } from '../modules/budgets/budgets.service';
+import { ExpoPushMessage } from 'expo-server-sdk';
 
 export function setupCronJobs(): void {
 
@@ -14,24 +16,41 @@ export function setupCronJobs(): void {
   cron.schedule('0 */4 * * *', async () => {
     try {
       const { rows: users } = await query<any>(
-        'SELECT id, email, full_name, notify_budget FROM user_profiles WHERE notify_budget = true'
+        'SELECT id, email, full_name, notify_budget, push_token FROM user_profiles WHERE notify_budget = true'
       );
+
+      const pushMessages: ExpoPushMessage[] = [];
 
       for (const user of users) {
         try {
           const alerts = await budgetsService.checkBudgetAlerts(user.id);
           for (const alert of alerts) {
+            const msgBody = `You have used ${alert.budget.percentUsed}% of your ${alert.budget.scope} budget.`;
             emailService.sendBudgetWarning(user.email, user.full_name, alert.budget.percentUsed);
+            
             await notificationsService.create(
               user.id,
               'budget_warning',
               'Budget Alert',
-              `You have used ${alert.budget.percentUsed}% of your ${alert.budget.scope} budget.`
+              msgBody
             );
+
+            if (user.push_token) {
+              pushMessages.push({
+                to: user.push_token,
+                sound: 'default',
+                title: 'Budget Alert ⚠️',
+                body: msgBody,
+              });
+            }
           }
         } catch (err) {
           console.error(`[Cron] Budget check failed for user ${user.id}:`, err);
         }
+      }
+
+      if (pushMessages.length > 0) {
+        await pushService.sendPushNotifications(pushMessages);
       }
     } catch (error) {
       console.error('[Cron] Budget Check Error:', error);
@@ -42,8 +61,10 @@ export function setupCronJobs(): void {
   cron.schedule('0 8 * * *', async () => {
     try {
       const { rows: users } = await query<any>(
-        'SELECT id, email, full_name FROM user_profiles WHERE notify_email = true'
+        'SELECT id, email, full_name, push_token FROM user_profiles WHERE notify_email = true OR notify_push = true'
       );
+
+      const pushMessages: ExpoPushMessage[] = [];
 
       for (const user of users) {
         emailService.sendDailyReminder(user.email, user.full_name);
@@ -53,6 +74,19 @@ export function setupCronJobs(): void {
           'Morning Reminder',
           "Don't forget to track your expenses today!"
         );
+
+        if (user.push_token) {
+          pushMessages.push({
+            to: user.push_token,
+            sound: 'default',
+            title: 'Good Morning! ☀️',
+            body: "Don't forget to track your expenses today!",
+          });
+        }
+      }
+
+      if (pushMessages.length > 0) {
+        await pushService.sendPushNotifications(pushMessages);
       }
     } catch (error) {
       console.error('[Cron] Morning Reminder Error:', error);
