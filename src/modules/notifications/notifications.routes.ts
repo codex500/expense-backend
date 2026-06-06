@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { notificationsController } from './notifications.controller';
-import { authenticate } from '../../shared/middleware/authenticate';
+import { authenticate, requireAdmin } from '../../shared/middleware/authenticate';
 
 const router = Router();
 router.use(authenticate as any);
@@ -12,5 +12,6 @@ router.put('/:id/unread', (req, res, next) => notificationsController.markAsUnre
 router.put('/read-all', (req, res, next) => notificationsController.markAllAsRead(req, res, next));
 router.delete('/:id', (req, res, next) => notificationsController.delete(req, res, next));
 router.post('/test-push', (req, res, next) => notificationsController.sendTest(req, res, next));
+router.post('/admin/broadcast', requireAdmin, (req, res, next) => notificationsController.adminBroadcast(req, res, next));
 
 export default router;

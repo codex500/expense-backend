@@ -105,6 +105,46 @@ export class NotificationsService {
 
     return { message: `Test notification sent to ${rows.length} device(s).`, sentCount: rows.length };
   }
+
+  async broadcastPushNotification(title: string, body: string, data?: any) {
+    const { rows: users } = await query<any>(
+      `SELECT u.id, dt.token as push_token 
+       FROM user_profiles u 
+       JOIN device_tokens dt ON u.id = dt.user_id AND dt.is_active = true
+       WHERE u.notify_push = true`
+    );
+
+    if (users.length === 0) {
+      return { message: 'No active device tokens found for any user.', sentCount: 0 };
+    }
+
+    const messages: any[] = [];
+    const uniqueUsers = new Set<string>();
+
+    for (const user of users) {
+      if (user.push_token) {
+        messages.push({
+          to: user.push_token,
+          sound: 'default',
+          title: title || 'Broadcast Notification',
+          body: body,
+          data: data || {},
+        });
+        uniqueUsers.add(user.id);
+      }
+    }
+
+    if (messages.length > 0) {
+      await pushService.sendPushNotifications(messages);
+      
+      // Also save in-app notifications for all targeted users
+      for (const userId of uniqueUsers) {
+        await this.create(userId, 'system', title || 'Broadcast Notification', body, data);
+      }
+    }
+
+    return { message: `Broadcast sent to ${messages.length} device(s) across ${uniqueUsers.size} user(s).`, sentCount: messages.length };
+  }
 }
 
 export const notificationsService = new NotificationsService();

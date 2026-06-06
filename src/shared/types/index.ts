@@ -10,6 +10,7 @@ export interface AuthUser {
   email: string;
   name: string;
   emailVerified: boolean;
+  isAdmin?: boolean;
 }
 
 /** Extended Express Request with authenticated user */

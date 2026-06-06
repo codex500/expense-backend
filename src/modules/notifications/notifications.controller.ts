@@ -66,6 +66,14 @@ export class NotificationsController {
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
+
+  async adminBroadcast(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { title, body, data } = req.body;
+      const result = await notificationsService.broadcastPushNotification(title, body, data);
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
 }
 
 export const notificationsController = new NotificationsController();

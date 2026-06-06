@@ -55,8 +55,9 @@ async function verifyToken(req: Request): Promise<AuthUser> {
     id: string;
     email: string;
     full_name: string;
+    is_admin: boolean;
   }>(
-    'SELECT id, email, full_name FROM user_profiles WHERE id = $1',
+    'SELECT id, email, full_name, is_admin FROM user_profiles WHERE id = $1',
     [userId]
   );
 
@@ -66,6 +67,7 @@ async function verifyToken(req: Request): Promise<AuthUser> {
       email: jwtEmail,
       name: jwtName,
       emailVerified: true, // If they have a valid token, assume verified
+      isAdmin: false
     };
   }
 
@@ -75,6 +77,7 @@ async function verifyToken(req: Request): Promise<AuthUser> {
     email: profile.email,
     name: profile.full_name,
     emailVerified: true,
+    isAdmin: profile.is_admin === true
   };
 }
 
@@ -98,5 +101,18 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
     next();
   } catch {
     next();
+  }
+};
+
+export const requireAdmin: RequestHandler = async (req, res, next) => {
+  try {
+    const authUser = await verifyToken(req);
+    if (!authUser.isAdmin) {
+      throw new UnauthorizedError('Access denied. Administrator privileges required.');
+    }
+    (req as AuthenticatedRequest).user = authUser;
+    next();
+  } catch (err) {
+    next(err);
   }
 };
