@@ -3,6 +3,7 @@
  */
 
 import { query } from '../../config/database';
+import { pushService } from '../../services/pushService';
 
 export class NotificationsService {
 
@@ -77,6 +78,32 @@ export class NotificationsService {
       [notifId, userId]
     );
     return { message: 'Notification deleted.' };
+  }
+
+  async sendTestPushNotification(userId: string, title: string, body: string, data?: any) {
+    const { rows } = await query(
+      'SELECT token FROM device_tokens WHERE user_id = $1 AND is_active = true',
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return { message: 'No active device tokens found for this user.', sentCount: 0 };
+    }
+
+    const messages = rows.map(row => ({
+      to: row.token,
+      sound: 'default',
+      title: title || 'Test Notification',
+      body: body || 'This is a test notification from the server.',
+      data: data || {},
+    }));
+
+    await pushService.sendPushNotifications(messages as any);
+    
+    // Also save it to in-app notifications
+    await this.create(userId, 'system', title || 'Test Notification', body || 'This is a test notification from the server.', data);
+
+    return { message: `Test notification sent to ${rows.length} device(s).`, sentCount: rows.length };
   }
 }
 

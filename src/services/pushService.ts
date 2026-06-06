@@ -1,6 +1,8 @@
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 
-const expo = new Expo();
+const expo = new Expo({
+  accessToken: process.env.EXPO_ACCESS_TOKEN,
+});
 
 export const sendPushNotifications = async (messages: ExpoPushMessage[]) => {
   const chunks = expo.chunkPushNotifications(messages);

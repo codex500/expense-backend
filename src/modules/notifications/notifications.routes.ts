@@ -11,5 +11,6 @@ router.put('/:id/read', (req, res, next) => notificationsController.markAsRead(r
 router.put('/:id/unread', (req, res, next) => notificationsController.markAsUnread(req, res, next));
 router.put('/read-all', (req, res, next) => notificationsController.markAllAsRead(req, res, next));
 router.delete('/:id', (req, res, next) => notificationsController.delete(req, res, next));
+router.post('/test-push', (req, res, next) => notificationsController.sendTest(req, res, next));
 
 export default router;

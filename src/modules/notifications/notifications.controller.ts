@@ -52,6 +52,20 @@ export class NotificationsController {
       sendSuccess(res, result);
     } catch (err) { next(err); }
   }
+
+  async sendTest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const authReq = req as unknown as AuthenticatedRequest;
+      const { title, body, data } = req.body;
+      const result = await notificationsService.sendTestPushNotification(
+        authReq.user.id, 
+        title, 
+        body, 
+        data
+      );
+      sendSuccess(res, result);
+    } catch (err) { next(err); }
+  }
 }
 
 export const notificationsController = new NotificationsController();
