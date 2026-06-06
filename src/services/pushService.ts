@@ -24,7 +24,7 @@ export const sendPushNotifications = async (messages: ExpoPushMessage[]) => {
         body: JSON.stringify(chunk),
       });
       
-      const data = await response.json();
+      const data = (await response.json()) as any;
       if (data && data.data) {
         tickets.push(...data.data);
       }
