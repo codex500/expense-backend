@@ -93,6 +93,7 @@ export class NotificationsService {
     const messages = rows.map(row => ({
       to: row.token,
       sound: 'default',
+      priority: 'high',
       title: title || 'Test Notification',
       body: body || 'This is a test notification from the server.',
       data: data || {},
@@ -126,6 +127,7 @@ export class NotificationsService {
         messages.push({
           to: user.push_token,
           sound: 'default',
+          priority: 'high',
           title: title || 'Broadcast Notification',
           body: body,
           data: data || {},
